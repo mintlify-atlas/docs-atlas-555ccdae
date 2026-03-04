@@ -1,0 +1,252 @@
+---
+title: voxtype config
+description: Display current Voxtype configuration
+---
+
+## Command
+
+```bash
+voxtype config
+```
+
+## Description
+
+Displays the current configuration settings loaded from `config.toml`, including all sections: hotkey, audio, engine, whisper, parakeet, moonshine, sensevoice, output, status, and integration. Also shows the output chain status (wtype, ydotool, clipboard availability) and model directories.
+
+This command is useful for:
+- **Debugging:** Verify which settings are active
+- **Validation:** Check if CLI overrides or environment variables are taking effect
+- **Troubleshooting:** Confirm model paths, output drivers, and backend configuration
+
+## Output Format
+
+The output is structured into sections matching the config file:
+
+### Hotkey Section
+
+```
+[hotkey]
+  key = "SCROLLLOCK"
+  modifiers = []
+  mode = PushToTalk
+```
+
+Shows the hotkey configuration, including the activation mode (PushToTalk or Toggle).
+
+### Audio Section
+
+```
+[audio]
+  device = "default"
+  sample_rate = 16000
+  max_duration_secs = 120
+
+[audio.feedback]
+  enabled = true
+  theme = "default"
+  volume = 0.5
+```
+
+Displays audio device, sample rate, maximum recording duration, and feedback sound settings.
+
+### Engine Section
+
+```
+[engine]
+  engine = Whisper
+```
+
+Shows the active transcription engine: `Whisper`, `Parakeet`, `Moonshine`, `SenseVoice`, `Paraformer`, `Dolphin`, or `Omnilingual`.
+
+### Whisper Section
+
+```
+[whisper]
+  model = "base"
+  language = Auto
+  translate = false
+```
+
+Displays the Whisper model name, language configuration, and translation setting. If `threads` is set, it appears here.
+
+### Parakeet Section (Experimental)
+
+```
+[parakeet] (EXPERIMENTAL)
+  model = "parakeet-tdt-0.6b-v3"
+  on_demand_loading = false
+  available models: parakeet-tdt-0.6b-v3, parakeet-tdt-0.6b-v3-int8
+```
+
+Shows installed Parakeet models (ONNX-based engine). If no models are installed, displays `(not configured)`.
+
+### Moonshine Section (Experimental)
+
+```
+[moonshine] (EXPERIMENTAL)
+  model = "base"
+  quantized = false
+  on_demand_loading = false
+  available models: moonshine-base, moonshine-tiny
+```
+
+Shows installed Moonshine models and configuration.
+
+### SenseVoice Section (Experimental)
+
+```
+[sensevoice] (EXPERIMENTAL)
+  model = "small"
+  language = Auto
+  use_itn = true
+  on_demand_loading = false
+  available models: sensevoice-small
+```
+
+Shows installed SenseVoice models and inverse text normalization (ITN) setting.
+
+### Output Section
+
+```
+[output]
+  mode = Type
+  fallback_to_clipboard = true
+  driver_order = (default: wtype -> dotool -> ydotool -> clipboard)
+  type_delay_ms = 0
+  pre_type_delay_ms = 100
+  restore_clipboard = false
+  restore_clipboard_delay_ms = 200
+
+[output.notification]
+  on_recording_start = false
+  on_recording_stop = false
+  on_transcription = false
+```
+
+Shows output mode, driver fallback chain, typing delays, clipboard restoration settings, and notification preferences.
+
+### Status Section
+
+```
+[status]
+  icon_theme = "emoji"
+  (resolved icons: idle="🎤" recording="🔴" transcribing="⚙️" stopped="💤")
+```
+
+Displays the icon theme and the actual icons used for each state. Icon themes include: `emoji`, `nerd-font`, `material`, `phosphor`, `codicons`, `omarchy`, `minimal`, `dots`, `arrows`, `text`, or a path to a custom theme file.
+
+### Integration Section
+
+```
+[integration]
+  state_file = "auto"
+  (resolves to: "/run/user/1000/voxtype/state")
+```
+
+Shows the state file path for external integrations (Waybar, polybar). `"auto"` resolves to the runtime directory.
+
+### Output Chain Status
+
+The command also displays which output tools are available:
+
+```
+Output Chain:
+  Display server:  Wayland (WAYLAND_DISPLAY=wayland-1)
+  wtype:           ✓ installed (/usr/bin/wtype)
+  eitype:          ✗ not installed
+  ydotool:         ⚠ installed (/usr/bin/ydotool), daemon not running
+  wl-copy:         ✓ installed (/usr/bin/wl-copy)
+
+  → Text will be typed via wtype (CJK supported)
+```
+
+This section shows:
+- **Display server:** Wayland or X11
+- **Tool status:** Installed, available, or missing
+- **Primary method:** Which tool will be used for typing
+
+### Config and Model Paths
+
+```
+---
+Config file: "/home/user/.config/voxtype/config.toml"
+Models dir: "/home/user/.local/share/voxtype/models"
+```
+
+## Examples
+
+### Basic Usage
+
+```bash
+# Show full configuration
+voxtype config
+```
+
+### Check Active Model
+
+```bash
+# Verify which Whisper model is configured
+voxtype config | grep -A5 "\[whisper\]"
+```
+
+Output:
+```
+[whisper]
+  model = "large-v3-turbo"
+  language = Auto
+  translate = false
+```
+
+### Check Output Chain
+
+```bash
+# See which output method will be used
+voxtype config | grep -A10 "Output Chain"
+```
+
+Output:
+```
+Output Chain:
+  Display server:  Wayland (WAYLAND_DISPLAY=wayland-1)
+  wtype:           ✓ installed (/usr/bin/wtype)
+  ...
+  → Text will be typed via wtype (CJK supported)
+```
+
+### Verify CLI Overrides
+
+```bash
+# Check if --model flag is taking effect
+voxtype --model medium config | grep "model ="
+```
+
+Output:
+```
+  model = "medium"
+```
+
+### Check Available Models
+
+```bash
+# List installed Parakeet models
+voxtype config | grep "available models:"
+```
+
+Output:
+```
+  available models: parakeet-tdt-0.6b-v3, parakeet-tdt-0.6b-v3-int8
+  available models: moonshine-base, moonshine-tiny
+```
+
+## Notes
+
+- **Configuration precedence:** CLI flags override environment variables, which override config file settings, which override built-in defaults.
+- **Path resolution:** The `config` command shows resolved paths (e.g., `"auto"` becomes the actual runtime directory path).
+- **Model validation:** The output shows whether configured models are actually installed.
+- **Output chain:** The display updates based on the current display server (Wayland vs X11) and installed tools.
+
+## See Also
+
+- [voxtype setup](/commands/setup) - Configure and install Voxtype
+- [voxtype status](/commands/status) - Show daemon status
+- [Configuration guide](/guides/configuration) - Full config file documentation

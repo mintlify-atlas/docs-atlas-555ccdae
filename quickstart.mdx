@@ -1,80 +1,285 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quick start"
+description: "Get Voxtype running on your Linux system in 5 minutes"
+icon: "rocket"
 ---
 
-## Get started in three steps
+Get Voxtype installed and transcribing speech in just a few steps.
 
-Get your documentation site running locally and make your first customization.
+## Installation
 
-### Step 1: Set up your local environment
+<Steps>
+  <Step title="Install Voxtype">
+    Choose your distribution's package manager or install from source.
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    <Tabs>
+      <Tab title="Arch Linux">
+        ```bash
+        yay -S voxtype
+        # or
+        yay -S voxtype-bin
+        ```
+      </Tab>
+      <Tab title="Debian/Ubuntu">
+        ```bash
+        wget https://github.com/peteonrails/voxtype/releases/latest/download/voxtype_*_amd64.deb
+        sudo dpkg -i voxtype_*_amd64.deb
+        ```
+      </Tab>
+      <Tab title="Fedora">
+        ```bash
+        wget https://github.com/peteonrails/voxtype/releases/latest/download/voxtype-*.x86_64.rpm
+        sudo dnf install voxtype-*.x86_64.rpm
+        ```
+      </Tab>
+      <Tab title="From source">
+        ```bash
+        # Install Rust
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
-### Step 2: Deploy your changes
+        # Clone and build
+        git clone https://github.com/peteonrails/voxtype.git
+        cd voxtype
+        cargo build --release
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+        # Binary is at: target/release/voxtype
+        ```
+      </Tab>
+    </Tabs>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    <Note>
+    See the [Installation](/installation) page for all options including GPU acceleration variants.
+    </Note>
+  </Step>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Install text input driver">
+    Voxtype needs a way to output text. Install `wtype` for best Unicode/CJK support on Wayland.
 
-### Step 3: Go live
+    <CodeGroup>
+    ```bash Fedora
+    sudo dnf install wtype wl-clipboard
+    ```
+    ```bash Arch
+    sudo pacman -S wtype wl-clipboard
+    ```
+    ```bash Ubuntu
+    sudo apt install wtype wl-clipboard
+    ```
+    </CodeGroup>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    <Tip>
+    `wtype` works on most Wayland compositors. For KDE/GNOME, install `dotool` or `ydotool` instead. See [Output Modes](/guides/output-modes) for details.
+    </Tip>
+  </Step>
 
-## Next steps
+  <Step title="Download transcription model">
+    Voxtype uses Whisper models for offline speech recognition. Download the `base.en` model for a good balance of speed and accuracy.
 
-Now that you have your docs running, explore these key features:
+    ```bash
+    voxtype setup --download
+    ```
+
+    This downloads the default model (~142 MB) to `~/.local/share/voxtype/`.
+
+    <Accordion title="Available models">
+    | Model | Size | Accuracy | Speed |
+    |-------|------|----------|-------|
+    | tiny.en | 39 MB | ~10% WER | Fastest |
+    | base.en | 142 MB | ~8% WER | Fast |
+    | small.en | 466 MB | ~6% WER | Medium |
+    | medium.en | 1.5 GB | ~5% WER | Slow |
+    | large-v3-turbo | 1.6 GB | ~4% WER | Fast (with GPU) |
+
+    Use `voxtype setup model` for interactive selection or `voxtype setup --download --model <name>` to download a specific model.
+    </Accordion>
+  </Step>
+
+  <Step title="Configure compositor keybinding">
+    The best way to use Voxtype is with your compositor's native keybindings. This provides push-to-talk without special permissions.
+
+    <Tabs>
+      <Tab title="Hyprland">
+        Add to `~/.config/hypr/hyprland.conf`:
+        ```
+        bind = SUPER, V, exec, voxtype record start
+        bindr = SUPER, V, exec, voxtype record stop
+        ```
+
+        Reload config: `hyprctl reload`
+      </Tab>
+      <Tab title="Sway">
+        Add to `~/.config/sway/config`:
+        ```
+        bindsym --no-repeat $mod+v exec voxtype record start
+        bindsym --release $mod+v exec voxtype record stop
+        ```
+
+        Reload config: `swaymsg reload`
+      </Tab>
+      <Tab title="River">
+        Add to `~/.config/river/init`:
+        ```bash
+        riverctl map normal Super V spawn 'voxtype record start'
+        riverctl map -release normal Super V spawn 'voxtype record stop'
+        ```
+
+        Restart River to apply changes.
+      </Tab>
+      <Tab title="X11 / Built-in hotkey">
+        If you're on X11 or prefer the built-in hotkey:
+
+        ```bash
+        # Add yourself to input group
+        sudo usermod -aG input $USER
+        # Log out and back in for changes to take effect
+        ```
+
+        The built-in hotkey is **ScrollLock** by default.
+      </Tab>
+    </Tabs>
+
+    Then disable the built-in hotkey to avoid conflicts:
+    ```bash
+    mkdir -p ~/.config/voxtype
+    cat > ~/.config/voxtype/config.toml << 'EOF'
+    [hotkey]
+    enabled = false
+    EOF
+    ```
+
+    <Warning>
+    If using compositor keybindings, you **must** set `enabled = false` to disable the built-in hotkey.
+    </Warning>
+  </Step>
+
+  <Step title="Start the daemon">
+    Run Voxtype to start the transcription daemon.
+
+    <Tabs>
+      <Tab title="Foreground">
+        ```bash
+        voxtype
+        ```
+
+        Keeps the daemon running in your terminal. Press Ctrl+C to stop.
+      </Tab>
+      <Tab title="Systemd">
+        ```bash
+        # Install service
+        voxtype setup systemd
+
+        # Enable and start
+        systemctl --user enable --now voxtype
+
+        # Check status
+        systemctl --user status voxtype
+        ```
+
+        The daemon starts automatically on login.
+      </Tab>
+    </Tabs>
+
+    You should see output like:
+    ```
+    [INFO] Loading model: base.en
+    [INFO] Model loaded successfully
+    [INFO] Daemon started, waiting for hotkey press...
+    ```
+  </Step>
+
+  <Step title="Test voice input">
+    Now test push-to-talk:
+
+    1. Click in any text field (browser, text editor, terminal)
+    2. Hold **Super+V** (or your configured hotkey)
+    3. Speak clearly: "This is a test of voice to text"
+    4. Release the key
+
+    After a moment, the transcribed text should appear at your cursor.
+
+    <Tip>
+    The first transcription may take a few seconds while the model loads. Subsequent transcriptions are much faster.
+    </Tip>
+  </Step>
+</Steps>
+
+## What's next?
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Basic usage" icon="keyboard" href="/guides/basic-usage">
+    Learn push-to-talk, toggle mode, and hotkey configuration
+  </Card>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Customize models, audio, output, and text processing
+  </Card>
+  <Card title="Transcription engines" icon="microchip" href="/features/transcription-engines">
+    Explore 7 engines for different languages and use cases
+  </Card>
+  <Card title="GPU acceleration" icon="rocket" href="/features/gpu-acceleration">
+    Enable Vulkan, CUDA, or ROCm for faster inference
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Text not appearing">
+    **Symptom:** Voxtype records but text doesn't appear at cursor.
+
+    **Solution:**
+    1. Verify `wtype` is installed: `which wtype`
+    2. Check daemon logs for output driver errors
+    3. Try clipboard mode: `voxtype --clipboard`
+    4. See [Output Modes](/guides/output-modes) for driver setup
+  </Accordion>
+
+  <Accordion title="Cannot open input device">
+    **Symptom:** Error: "Cannot open input device"
+
+    **Solution:**
+    - If using compositor keybindings: Set `[hotkey] enabled = false` in config
+    - If using built-in hotkey: Add yourself to input group: `sudo usermod -aG input $USER` and log out/in
+  </Accordion>
+
+  <Accordion title="No audio captured">
+    **Symptom:** Recording starts but produces empty transcription.
+
+    **Solution:**
+    ```bash
+    # List audio sources
+    pactl list sources short
+
+    # Test recording
+    arecord -d 3 -f S16_LE -r 16000 test.wav
+    aplay test.wav
+
+    # Configure device in config.toml
+    [audio]
+    device = "alsa_input.your_device_name"
+    ```
+  </Accordion>
+
+  <Accordion title="Model not found">
+    **Symptom:** Error: "Model file not found"
+
+    **Solution:**
+    ```bash
+    # Download the default model
+    voxtype setup --download
+
+    # Or download a specific model
+    voxtype setup --download --model base.en
+
+    # Verify models
+    ls ~/.local/share/voxtype/
+    ```
+  </Accordion>
+</AccordionGroup>
+
+For more troubleshooting, see the [Troubleshooting](/advanced/troubleshooting) guide.
+
+## Community
+
+- **GitHub:** [github.com/peteonrails/voxtype](https://github.com/peteonrails/voxtype)
+- **Issues:** [Report bugs or request features](https://github.com/peteonrails/voxtype/issues)
+- **Discussions:** [Ask questions](https://github.com/peteonrails/voxtype/discussions)

@@ -1,0 +1,631 @@
+---
+title: Output Modes
+description: Understanding and configuring type, clipboard, paste, and file output modes in Voxtype
+---
+
+# Output Modes
+
+Voxtype supports multiple ways to deliver transcribed text. This guide covers all output modes, drivers, and the fallback chain.
+
+## Available Output Modes
+
+Voxtype provides four primary output modes:
+
+1. **Type** - Simulates keyboard input at cursor position
+2. **Clipboard** - Copies text to clipboard
+3. **Paste** - Copies to clipboard and simulates paste keystroke
+4. **File** - Writes transcription to a file
+
+## Type Mode
+
+Type mode simulates keyboard input, inserting text at the current cursor position.
+
+### Basic Configuration
+
+```toml
+[output]
+mode = "type"
+fallback_to_clipboard = true
+type_delay_ms = 0
+```
+
+### How It Works
+
+Type mode uses virtual keyboard drivers to inject text. Voxtype tries multiple drivers in order:
+
+1. **wtype** - Wayland virtual keyboard protocol
+2. **dotool** - uinput with keyboard layout support
+3. **ydotool** - uinput fallback
+4. **clipboard** - Universal fallback (if `fallback_to_clipboard = true`)
+
+### Driver Details
+
+#### wtype
+
+**Best for:**
+- Wayland compositors (Hyprland, Sway, River)
+- Unicode and CJK text (Chinese, Japanese, Korean)
+- US keyboard layouts
+
+**Pros:**
+- No daemon required
+- Excellent Unicode/CJK support
+- Fast and reliable on Wayland
+
+**Cons:**
+- Doesn't work on KDE Plasma or GNOME Wayland
+- Doesn't work on X11
+- No keyboard layout support (assumes US layout)
+
+**Installation:**
+
+```bash
+# Fedora
+sudo dnf install wtype
+
+# Arch
+sudo pacman -S wtype
+
+# Ubuntu/Debian
+sudo apt install wtype
+```
+
+#### dotool
+
+**Best for:**
+- Non-US keyboard layouts (German, French, etc.)
+- X11 and Wayland
+- KDE Plasma and GNOME
+
+**Pros:**
+- Supports keyboard layouts via XKB
+- No daemon required
+- Works on X11 and Wayland
+
+**Cons:**
+- Requires configuration for non-US layouts
+- Requires uinput access
+
+**Installation:**
+
+```bash
+# Install from AUR (Arch)
+paru -S dotool-bin
+
+# Or build from source
+git clone https://git.sr.ht/~geb/dotool
+cd dotool
+make
+sudo make install
+```
+
+**Configuration for non-US layouts:**
+
+```toml
+[output]
+dotool_xkb_layout = "de"  # German
+dotool_xkb_variant = "nodeadkeys"  # Optional variant
+```
+
+Available layouts: `de` (German), `fr` (French), `es` (Spanish), `it` (Italian), etc. See `/usr/share/X11/xkb/symbols/` for all layouts.
+
+#### ydotool
+
+**Best for:**
+- X11 and Wayland fallback
+- When wtype and dotool don't work
+
+**Pros:**
+- Works on X11 and Wayland
+- Works on TTY
+
+**Cons:**
+- Requires ydotoold daemon
+- Slower than wtype
+- No keyboard layout support
+
+**Installation:**
+
+```bash
+# Fedora
+sudo dnf install ydotool
+
+# Arch
+sudo pacman -S ydotool
+
+# Ubuntu/Debian
+sudo apt install ydotool
+
+# Enable and start daemon
+systemctl --user enable --now ydotool
+```
+
+### Customizing Driver Order
+
+Change the fallback chain:
+
+```toml
+[output]
+driver_order = ["wtype", "dotool", "ydotool", "clipboard"]
+```
+
+**Examples:**
+
+```toml
+# Prefer dotool (for non-US layouts)
+driver_order = ["dotool", "wtype", "clipboard"]
+
+# Prefer ydotool over dotool
+driver_order = ["wtype", "ydotool", "dotool", "clipboard"]
+
+# Use only ydotool (no fallback)
+driver_order = ["ydotool"]
+```
+
+### Typing Delays
+
+If characters are dropped or typed out of order:
+
+```toml
+[output]
+# Delay before typing starts (ms)
+pre_type_delay_ms = 100
+
+# Delay between each character (ms)
+type_delay_ms = 10
+```
+
+Start with `pre_type_delay_ms = 100` and increase if needed. `type_delay_ms` is rarely necessary.
+
+<Note>
+When using compositor integration with submaps, you may not need `pre_type_delay_ms`. The submap switch itself provides a natural delay.
+</Note>
+
+### Auto-Submit
+
+Automatically press Enter after typing:
+
+```toml
+[output]
+auto_submit = true
+```
+
+Useful for:
+- Chat applications (Slack, Discord)
+- Command-line terminals
+- Forms and search boxes
+
+### Shift+Enter Newlines
+
+Convert newlines to Shift+Enter:
+
+```toml
+[output]
+shift_enter_newlines = true
+```
+
+Useful for apps where Enter submits:
+- Slack (Shift+Enter for newlines)
+- Discord (Shift+Enter for newlines)
+- Cursor IDE chat (Shift+Enter for newlines)
+
+### Append Text
+
+Add text after each transcription:
+
+```toml
+[output]
+append_text = " "  # Add trailing space
+```
+
+Useful for incremental dictation where you want sentences separated.
+
+## Clipboard Mode
+
+Copies transcribed text to the clipboard without typing.
+
+### Configuration
+
+```toml
+[output]
+mode = "clipboard"
+```
+
+### How It Works
+
+Uses `wl-copy` (Wayland) or `xclip` (X11) to copy text to the clipboard.
+
+### Installation
+
+```bash
+# Wayland
+sudo dnf install wl-clipboard  # Fedora
+sudo pacman -S wl-clipboard    # Arch
+sudo apt install wl-clipboard  # Ubuntu
+
+# X11
+sudo dnf install xclip  # Fedora
+sudo pacman -S xclip    # Arch
+sudo apt install xclip  # Ubuntu
+```
+
+### When to Use
+
+- You want to paste text manually
+- Typing doesn't work in your environment
+- You're dictating into a non-standard text field
+
+## Paste Mode
+
+Combines clipboard mode with automatic paste keystroke.
+
+### Configuration
+
+```toml
+[output]
+mode = "paste"
+paste_keys = "ctrl+v"  # Default
+```
+
+### How It Works
+
+1. Copies text to clipboard
+2. Simulates paste keystroke (default: Ctrl+V)
+3. Optionally restores previous clipboard content
+
+### Paste Keystroke Options
+
+```toml
+[output]
+paste_keys = "ctrl+v"        # Standard (default)
+paste_keys = "shift+insert"  # Alternative
+paste_keys = "ctrl+shift+v"  # Some terminal emulators
+```
+
+### Clipboard Restoration
+
+Preserve your existing clipboard content:
+
+```toml
+[output]
+restore_clipboard = true
+restore_clipboard_delay_ms = 200  # Wait for paste to complete
+```
+
+This:
+1. Saves current clipboard content
+2. Copies transcription to clipboard
+3. Simulates paste keystroke
+4. Waits 200ms
+5. Restores original clipboard content
+
+### When to Use Paste Mode
+
+- **Non-US keyboard layouts** where typing produces wrong characters
+- **KDE Plasma or GNOME** where wtype doesn't work
+- **Applications with special paste handling** (VS Code, terminals)
+
+<Tip>
+For non-US keyboard layouts, paste mode is often more reliable than type mode with layout configuration.
+</Tip>
+
+## File Mode
+
+Writes transcription to a file instead of typing or clipboard.
+
+### Configuration
+
+```toml
+[output]
+mode = "file"
+file_path = "/tmp/voxtype-output.txt"
+file_mode = "overwrite"  # or "append"
+```
+
+### File Modes
+
+**Overwrite (default):**
+
+```toml
+[output]
+file_mode = "overwrite"
+```
+
+Each transcription replaces the file contents. Useful for:
+- Clipboard alternative (read file after each transcription)
+- Single-use transcriptions
+
+**Append:**
+
+```toml
+[output]
+file_mode = "append"
+```
+
+Each transcription is appended to the file. Useful for:
+- Continuous note-taking
+- Logging transcriptions
+- Building documents incrementally
+
+### Per-Invocation File Output
+
+Override output to file for a single recording:
+
+```bash
+# Use file_path from config
+voxtype record start --file
+voxtype record stop
+
+# Use specific file path
+voxtype record start --file=notes.txt
+voxtype record stop
+
+# With compositor keybindings
+bind = SUPER, F, exec, voxtype record start --file=notes.txt
+bindr = SUPER, F, exec, voxtype record stop
+```
+
+## Fallback Chain
+
+When `fallback_to_clipboard = true`, Voxtype tries drivers in order until one succeeds:
+
+```
+wtype → dotool → ydotool → clipboard
+```
+
+Example:
+- **Hyprland:** wtype succeeds
+- **KDE Plasma:** wtype fails, dotool succeeds
+- **X11 with ydotool:** wtype fails, dotool fails, ydotool succeeds
+- **No typing tools installed:** wtype fails, dotool fails, ydotool fails, clipboard succeeds
+
+This ensures text is always delivered, even if the preferred method fails.
+
+### Disabling Fallback
+
+```toml
+[output]
+fallback_to_clipboard = false
+```
+
+If all typing drivers fail, the transcription is lost (logged to stderr).
+
+## Per-Invocation Overrides
+
+Override output mode for a single recording:
+
+```bash
+# Force clipboard mode (just this recording)
+voxtype record start --clipboard
+voxtype record stop
+
+# Force paste mode
+voxtype record start --paste
+voxtype record stop
+
+# Force type mode (override config clipboard mode)
+voxtype record start --type
+voxtype record stop
+```
+
+With compositor keybindings:
+
+```hyprlang
+# Hyprland example: different keys for different modes
+bind = SUPER, V, exec, voxtype record start           # Type mode (from config)
+bindr = SUPER, V, exec, voxtype record stop
+
+bind = SUPER, C, exec, voxtype record start --clipboard  # Clipboard mode
+bindr = SUPER, C, exec, voxtype record stop
+
+bind = SUPER, P, exec, voxtype record start --paste  # Paste mode
+bindr = SUPER, P, exec, voxtype record stop
+
+bind = SUPER, F, exec, voxtype record start --file=notes.txt  # File mode
+bindr = SUPER, F, exec, voxtype record stop
+```
+
+## Troubleshooting
+
+### Text Not Appearing
+
+**Check available drivers:**
+
+```bash
+which wtype dotool ydotool wl-copy
+```
+
+Install missing drivers.
+
+**Test manually:**
+
+```bash
+# Test wtype
+echo "hello" | wtype -
+
+# Test dotool
+echo "type hello" | dotool
+
+# Test ydotool
+ydotool type "hello"
+
+# Test clipboard
+echo "hello" | wl-copy
+wl-paste
+```
+
+**Check daemon logs:**
+
+```bash
+journalctl --user -u voxtype -f
+```
+
+Look for "Failed to type" or "Falling back to clipboard" messages.
+
+### Wrong Characters on Non-US Layouts
+
+**Problem:** Y and Z are swapped, or special characters are wrong.
+
+**Solution 1: Use dotool with layout configuration:**
+
+```toml
+[output]
+driver_order = ["dotool", "wtype", "clipboard"]
+dotool_xkb_layout = "de"  # Your layout
+```
+
+**Solution 2: Use paste mode:**
+
+```toml
+[output]
+mode = "paste"
+paste_keys = "ctrl+v"
+```
+
+Paste mode bypasses keyboard layout issues.
+
+### wtype Not Working on KDE Plasma or GNOME
+
+**Problem:** wtype doesn't insert text on KDE Plasma or GNOME Wayland.
+
+**Cause:** These compositors don't support the virtual-keyboard protocol.
+
+**Solution:** Use dotool or paste mode:
+
+```toml
+[output]
+driver_order = ["dotool", "ydotool", "clipboard"]
+```
+
+Or:
+
+```toml
+[output]
+mode = "paste"
+```
+
+### ydotool Not Working
+
+**Problem:** ydotool fails with "cannot open /dev/uinput" or "socket error".
+
+**Solution 1: Start daemon:**
+
+```bash
+systemctl --user enable --now ydotool
+```
+
+**Solution 2: Load uinput module:**
+
+```bash
+sudo modprobe uinput
+echo "uinput" | sudo tee /etc/modules-load.d/uinput.conf
+```
+
+**Solution 3: Check permissions:**
+
+```bash
+ls -la /dev/uinput
+# Should show rw permissions for your user or input group
+```
+
+### Text Appears Slowly or Characters Dropped
+
+**Problem:** Characters appear one at a time with visible delay, or some characters don't appear.
+
+**Solution:** Increase delays:
+
+```toml
+[output]
+pre_type_delay_ms = 100
+type_delay_ms = 10
+```
+
+### Auto-Submit Not Working
+
+**Problem:** Enter key isn't pressed after transcription.
+
+**Solution:** Ensure auto_submit is enabled:
+
+```toml
+[output]
+auto_submit = true
+```
+
+Check if you have `--no-auto-submit` in your CLI or compositor keybindings:
+
+```bash
+voxtype record start --no-auto-submit  # Disables auto-submit for this recording
+```
+
+## Common Configuration Examples
+
+### Wayland with wtype (Default)
+
+```toml
+[output]
+mode = "type"
+driver_order = ["wtype", "dotool", "ydotool", "clipboard"]
+fallback_to_clipboard = true
+type_delay_ms = 0
+```
+
+### Non-US Keyboard Layout
+
+```toml
+[output]
+mode = "type"
+driver_order = ["dotool", "wtype", "clipboard"]
+dotool_xkb_layout = "de"
+fallback_to_clipboard = true
+```
+
+### KDE Plasma or GNOME
+
+```toml
+[output]
+mode = "paste"
+paste_keys = "ctrl+v"
+restore_clipboard = true
+```
+
+### Chat Applications (Auto-Submit)
+
+```toml
+[output]
+mode = "type"
+auto_submit = true
+shift_enter_newlines = true  # For multi-line messages
+```
+
+### Continuous Note-Taking
+
+```toml
+[output]
+mode = "file"
+file_path = "~/Documents/notes.txt"
+file_mode = "append"
+```
+
+### Clipboard-Only (Manual Paste)
+
+```toml
+[output]
+mode = "clipboard"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Text Processing" icon="wand-magic-sparkles" href="/guides/text-processing">
+    Post-process transcriptions with LLMs and word replacements
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/guides/configuration">
+    Complete configuration reference
+  </Card>
+  <Card title="Compositor Integration" icon="window" href="/guides/compositor-integration">
+    Set up Hyprland, Sway, or River keybindings
+  </Card>
+  <Card title="Basic Usage" icon="book-open" href="/guides/basic-usage">
+    Return to basic usage guide
+  </Card>
+</CardGroup>

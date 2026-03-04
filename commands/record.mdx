@@ -1,0 +1,411 @@
+---
+title: 'voxtype record'
+description: 'Control recording from external sources like compositor keybindings'
+icon: 'microphone'
+---
+
+## Overview
+
+The `voxtype record` command sends control signals to a running daemon via Unix signals and file triggers. This allows external programs (compositor keybindings, scripts, launchers) to control recording without using built-in hotkey detection.
+
+<Info>
+  The daemon must already be running (`voxtype daemon`) for record commands to work.
+</Info>
+
+## Subcommands
+
+### start
+
+Start recording immediately.
+
+```bash
+voxtype record start
+```
+
+**Signal mechanism:** Sends `SIGUSR1` to the daemon process.
+
+### stop
+
+Stop recording and begin transcription.
+
+```bash
+voxtype record stop
+```
+
+**Signal mechanism:** Sends `SIGUSR2` to the daemon process.
+
+### toggle
+
+Toggle recording state. If idle, start recording. If recording, stop and transcribe.
+
+```bash
+voxtype record toggle
+```
+
+**Signal mechanism:** Reads current state from state file, sends `SIGUSR1` (start) or `SIGUSR2` (stop) accordingly.
+
+<Note>
+  Toggle requires `state_file = "auto"` in your config to track state between commands.
+</Note>
+
+### cancel
+
+Cancel current recording or transcription without outputting any text.
+
+```bash
+voxtype record cancel
+```
+
+**File trigger mechanism:** Writes a cancel trigger file that the daemon monitors.
+
+## Output mode overrides
+
+Override the default output mode for a single recording. These flags are mutually exclusive.
+
+<ParamField path="--type" type="flag">
+  Force type mode - simulate keyboard typing.
+
+  ```bash
+  voxtype record start --type
+  ```
+
+  Available on: `start`, `stop`, `toggle`
+</ParamField>
+
+<ParamField path="--clipboard" type="flag">
+  Force clipboard mode - copy text to clipboard only, don't type.
+
+  ```bash
+  voxtype record toggle --clipboard
+  ```
+
+  Available on: `start`, `stop`, `toggle`
+</ParamField>
+
+<ParamField path="--paste" type="flag">
+  Force paste mode - copy to clipboard and simulate Ctrl+V.
+
+  ```bash
+  voxtype record start --paste
+  ```
+
+  Available on: `start`, `stop`, `toggle`
+</ParamField>
+
+<ParamField path="--file" type="string">
+  Write transcription to a file. Use `--file` alone to use `file_path` from config, or `--file=path.txt` for an explicit path.
+
+  ```bash
+  # Use file_path from config
+  voxtype record start --file
+
+  # Explicit path
+  voxtype record start --file=~/notes.txt
+  voxtype record toggle --file=/tmp/transcription.txt
+  ```
+
+  Available on: `start`, `toggle`
+</ParamField>
+
+## Model selection
+
+<ParamField path="--model" type="string">
+  Use a specific model for this recording. Overrides default model configuration.
+
+  ```bash
+  voxtype record start --model large-v3-turbo
+  voxtype record toggle --model base.en
+  ```
+
+  Available on: `start`, `toggle`
+
+  <Tip>
+    Model selection happens at recording start. The `stop` command doesn't support `--model` because the model was already chosen when recording began.
+  </Tip>
+</ParamField>
+
+## Profile selection
+
+Profiles are named configuration presets defined in `config.toml` under `[profiles.name]` that can apply post-processing, custom commands, or output settings.
+
+<ParamField path="--profile" type="string">
+  Use a named profile for post-processing.
+
+  ```bash
+  voxtype record start --profile slack
+  voxtype record toggle --profile code
+  ```
+
+  Available on: `start`, `toggle`
+
+  Example profile in `config.toml`:
+  ```toml
+  [profiles.slack]
+  post_process_command = "llm -m gpt-4o-mini 'Make this message casual and friendly'"
+  shift_enter_newlines = true
+
+  [profiles.code]
+  post_process_command = "llm -m gpt-4o-mini 'Format as code comment'"
+  ```
+</ParamField>
+
+## Auto-submit overrides
+
+<ParamField path="--auto-submit" type="flag">
+  Press Enter after this transcription.
+
+  ```bash
+  voxtype record start --auto-submit
+  ```
+
+  Available on: `start`, `toggle`
+</ParamField>
+
+<ParamField path="--no-auto-submit" type="flag">
+  Disable auto-submit for this transcription (overrides config setting).
+
+  ```bash
+  voxtype record toggle --no-auto-submit
+  ```
+
+  Available on: `start`, `toggle`
+</ParamField>
+
+## Shift+Enter newlines
+
+<ParamField path="--shift-enter-newlines" type="flag">
+  Use Shift+Enter for newlines in this transcription. Useful for chat apps that send on Enter.
+
+  ```bash
+  voxtype record start --shift-enter-newlines
+  ```
+
+  Available on: `start`, `toggle`
+</ParamField>
+
+<ParamField path="--no-shift-enter-newlines" type="flag">
+  Disable Shift+Enter newlines for this transcription (overrides config).
+
+  ```bash
+  voxtype record toggle --no-shift-enter-newlines
+  ```
+
+  Available on: `start`, `toggle`
+</ParamField>
+
+## Compositor integration examples
+
+### Hyprland
+
+Add to `~/.config/hypr/hyprland.conf`:
+
+```
+# Toggle recording with Super+R
+bind = SUPER, R, exec, voxtype record toggle
+
+# Start/stop with separate keys
+bind = SUPER, R, exec, voxtype record start
+bind = SUPER SHIFT, R, exec, voxtype record stop
+
+# Cancel with Escape (while recording)
+bind = SUPER, Escape, exec, voxtype record cancel
+
+# Mode-specific bindings
+bind = SUPER SHIFT, C, exec, voxtype record start --clipboard
+bind = SUPER SHIFT, V, exec, voxtype record start --paste
+
+# Profile-based bindings
+bind = SUPER, S, exec, voxtype record toggle --profile slack
+bind = SUPER, N, exec, voxtype record toggle --profile notes --file
+```
+
+### Sway
+
+Add to `~/.config/sway/config`:
+
+```
+# Toggle recording
+bindsym $mod+r exec voxtype record toggle
+
+# Start/stop explicitly
+bindsym $mod+r exec voxtype record start
+bindsym $mod+Shift+r exec voxtype record stop
+
+# Cancel
+bindsym $mod+Escape exec voxtype record cancel
+
+# Output mode overrides
+bindsym $mod+Shift+c exec voxtype record start --clipboard
+bindsym $mod+Shift+v exec voxtype record start --paste
+```
+
+### River
+
+Add to `~/.config/river/init`:
+
+```bash
+# Toggle recording
+riverctl map normal Super R spawn "voxtype record toggle"
+
+# Start/stop
+riverctl map normal Super R spawn "voxtype record start"
+riverctl map normal Super+Shift R spawn "voxtype record stop"
+
+# Cancel
+riverctl map normal Super Escape spawn "voxtype record cancel"
+```
+
+### i3 / i3wm
+
+Add to `~/.config/i3/config`:
+
+```
+# Toggle recording
+bindsym $mod+r exec --no-startup-id voxtype record toggle
+
+# Start/stop
+bindsym $mod+r exec --no-startup-id voxtype record start
+bindsym $mod+Shift+r exec --no-startup-id voxtype record stop
+
+# Cancel
+bindsym $mod+Escape exec --no-startup-id voxtype record cancel
+```
+
+## Advanced usage patterns
+
+### Context-aware bindings
+
+Use different profiles or models based on active window:
+
+```bash
+#!/bin/bash
+# Hyprland: Smart recording based on active window
+
+active_window=$(hyprctl activewindow -j | jq -r '.class')
+
+case "$active_window" in
+  slack|discord|teams)
+    voxtype record toggle --profile chat --shift-enter-newlines
+    ;;
+  code|neovim|zed)
+    voxtype record toggle --profile code
+    ;;
+  obsidian|notion)
+    voxtype record toggle --profile notes --file
+    ;;
+  *)
+    voxtype record toggle
+    ;;
+esac
+```
+
+### Rofi launcher integration
+
+```bash
+#!/bin/bash
+# voxtype-rofi.sh - Launch with different modes
+
+mode=$(echo -e "Type\nClipboard\nPaste\nFile\nCancel" | rofi -dmenu -p "Voxtype mode")
+
+case "$mode" in
+  Type) voxtype record toggle --type ;;
+  Clipboard) voxtype record toggle --clipboard ;;
+  Paste) voxtype record toggle --paste ;;
+  File) voxtype record toggle --file=~/Desktop/recording.txt ;;
+  Cancel) voxtype record cancel ;;
+esac
+```
+
+### Notification feedback
+
+Show desktop notifications on recording state changes:
+
+```bash
+#!/bin/bash
+# Start recording with notification
+voxtype record start
+notify-send "Voxtype" "Recording started" -t 1000
+
+# Stop with notification
+voxtype record stop
+notify-send "Voxtype" "Transcribing..." -t 2000
+```
+
+## Signal-based IPC mechanism
+
+Under the hood, `voxtype record` uses Unix signals and file triggers for inter-process communication:
+
+| Command | Mechanism | Signal/File |
+|---------|-----------|-------------|
+| `start` | Unix signal | `SIGUSR1` to daemon PID |
+| `stop` | Unix signal | `SIGUSR2` to daemon PID |
+| `toggle` | State check + signal | Read state file, send `SIGUSR1` or `SIGUSR2` |
+| `cancel` | File trigger | Write to `$XDG_RUNTIME_DIR/voxtype/cancel` |
+
+**Override files** (written before sending signal):
+
+- `output_mode_override` - Contains `type`, `clipboard`, `paste`, or `file[:path]`
+- `model_override` - Contains model name
+- `profile_override` - Contains profile name
+- `auto_submit_override` - Contains `true` or `false`
+- `shift_enter_override` - Contains `true` or `false`
+
+These files are read by the daemon when it receives the signal, then deleted after being processed.
+
+## Troubleshooting
+
+### Daemon not running
+
+```
+Error: Voxtype daemon is not running.
+Start it with: voxtype daemon
+```
+
+**Solution:** Start the daemon first:
+```bash
+voxtype daemon
+# Or as a background process:
+nohup voxtype daemon &>/dev/null &
+```
+
+### Toggle requires state file
+
+```
+Error: Cannot toggle recording without state_file configured.
+```
+
+**Solution:** Enable state file in `config.toml`:
+```toml
+state_file = "auto"  # Uses $XDG_RUNTIME_DIR/voxtype/state
+```
+
+### Profile not found
+
+```
+Error: Profile 'slack' not found.
+Available profiles: code, notes
+```
+
+**Solution:** Add the profile to `config.toml`:
+```toml
+[profiles.slack]
+post_process_command = "llm -m gpt-4o-mini 'Make casual'"
+shift_enter_newlines = true
+```
+
+### Stale PID file
+
+```
+Error: Voxtype daemon is not running (stale PID file removed).
+```
+
+**Solution:** The PID file was cleaned up automatically. Start the daemon again:
+```bash
+voxtype daemon
+```
+
+## See also
+
+- [voxtype daemon](/commands/daemon) - Main daemon mode
+- [voxtype status](/commands/status) - Monitor daemon state
+- [Compositor integration guide](/guides/compositor-integration) - Detailed setup for each compositor

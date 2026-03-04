@@ -1,0 +1,347 @@
+---
+title: voxtype status
+description: Show daemon status for integration
+---
+
+## Command
+
+```bash
+voxtype status [flags]
+```
+
+## Description
+
+Display the current state of the Voxtype daemon. Designed for integration with status bars (Waybar, polybar, i3status) and custom scripts. Supports one-shot mode (print current state and exit) and follow mode (continuously output state changes).
+
+Possible states:
+- **idle** - Daemon is running and ready to record
+- **recording** - Currently recording audio
+- **transcribing** - Processing the recorded audio
+- **stopped** - Daemon is not running
+
+## Flags
+
+<ParamField path="--follow" type="boolean">
+  Continuously output status changes as JSON (for Waybar `exec` modules)
+  
+  Watches the state file using inotify and prints a new line whenever the state changes. Also detects when the daemon stops (process dies or state file is deleted).
+</ParamField>
+
+<ParamField path="--format" type="string" default="text">
+  Output format: `text` or `json`
+  
+  - **text:** Plain state name ("idle", "recording", "transcribing", "stopped")
+  - **json:** Waybar-compatible JSON with `text`, `alt`, `class`, and `tooltip` fields
+</ParamField>
+
+<ParamField path="--extended" type="boolean">
+  Include extended info in JSON output (model, device, backend)
+  
+  Adds `model`, `device`, and `backend` fields to the JSON output. Useful for status bar tooltips showing detailed information.
+</ParamField>
+
+<ParamField path="--icon-theme" type="string">
+  Icon theme for JSON output
+  
+  Overrides the `status.icon_theme` setting in config. Available themes:
+  - `emoji` - 🎤 🔴 ⚙️ 💤
+  - `nerd-font` - Nerd Font icons
+  - `material` - Material Design icons
+  - `phosphor` - Phosphor icons
+  - `codicons` - VS Code icons
+  - `omarchy` - Omarchy (Arch) theme
+  - `minimal` - Simple ASCII
+  - `dots` - Dots (○ ● ◉ ◌)
+  - `arrows` - Arrows (▶ ⏸ ⏹)
+  - `text` - Text labels ("IDLE", "REC", "PROC")
+  - `/path/to/theme.toml` - Custom theme file
+</ParamField>
+
+## JSON Output Format
+
+When `--format json` is used, the output is a Waybar-compatible JSON object:
+
+```json
+{
+  "text": "🎤",
+  "alt": "idle",
+  "class": "idle",
+  "tooltip": "Voxtype ready - hold hotkey to record"
+}
+```
+
+### Fields
+
+<ParamField path="text" type="string">
+  Icon or text to display (based on `--icon-theme`)
+</ParamField>
+
+<ParamField path="alt" type="string">
+  State name for Waybar `format-icons` mapping
+  
+  Allows Waybar to choose icons based on state using the `format-icons` directive.
+</ParamField>
+
+<ParamField path="class" type="string">
+  CSS class name for styling (same as state name)
+  
+  Use in Waybar CSS to style each state differently:
+  ```css
+  #custom-voxtype.recording {
+    color: #ff0000;
+  }
+  ```
+</ParamField>
+
+<ParamField path="tooltip" type="string">
+  Human-readable description of the current state
+</ParamField>
+
+### Extended Fields
+
+When `--extended` is used, additional fields are included:
+
+<ParamField path="model" type="string">
+  Model name (e.g., "base", "large-v3-turbo", "parakeet-tdt-0.6b-v3")
+</ParamField>
+
+<ParamField path="device" type="string">
+  Audio input device name
+</ParamField>
+
+<ParamField path="backend" type="string">
+  Transcription backend (e.g., "CPU (AVX2)", "GPU (Vulkan)", "GPU (CUDA)")
+</ParamField>
+
+**Extended JSON example:**
+
+```json
+{
+  "text": "🎤",
+  "alt": "idle",
+  "class": "idle",
+  "tooltip": "Voxtype ready - hold hotkey to record\nModel: large-v3-turbo\nDevice: default\nBackend: GPU (Vulkan)",
+  "model": "large-v3-turbo",
+  "device": "default",
+  "backend": "GPU (Vulkan)"
+}
+```
+
+## Examples
+
+### One-Shot Status Check
+
+```bash
+# Plain text (default)
+voxtype status
+# Output: idle
+
+# JSON format
+voxtype status --format json
+# Output: {"text": "🎤", "alt": "idle", "class": "idle", "tooltip": "Voxtype ready - hold hotkey to record"}
+```
+
+### Waybar Integration
+
+Add to your Waybar config (`~/.config/waybar/config`):
+
+```json
+{
+  "modules-right": ["custom/voxtype"],
+  "custom/voxtype": {
+    "exec": "voxtype status --follow --format json",
+    "return-type": "json",
+    "interval": "once",
+    "format": "{icon}",
+    "format-icons": {
+      "idle": "🎤",
+      "recording": "🔴",
+      "transcribing": "⚙️",
+      "stopped": "💤"
+    },
+    "tooltip": true
+  }
+}
+```
+
+Style with CSS (`~/.config/waybar/style.css`):
+
+```css
+#custom-voxtype {
+  padding: 0 10px;
+}
+
+#custom-voxtype.idle {
+  color: #a6e3a1;
+}
+
+#custom-voxtype.recording {
+  color: #f38ba8;
+  animation: blink 1s ease-in-out infinite;
+}
+
+#custom-voxtype.transcribing {
+  color: #f9e2af;
+}
+
+#custom-voxtype.stopped {
+  color: #6c7086;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+```
+
+**Quick install:**
+
+```bash
+voxtype setup waybar --install
+pkill -SIGUSR2 waybar  # Reload Waybar
+```
+
+### Extended Information
+
+```bash
+# Show extended info (model, device, backend)
+voxtype status --format json --extended
+```
+
+Output:
+```json
+{
+  "text": "🎤",
+  "alt": "idle",
+  "class": "idle",
+  "tooltip": "Voxtype ready - hold hotkey to record\nModel: large-v3-turbo\nDevice: default\nBackend: GPU (Vulkan)",
+  "model": "large-v3-turbo",
+  "device": "default",
+  "backend": "GPU (Vulkan)"
+}
+```
+
+Use in Waybar to show detailed info in the tooltip.
+
+### Custom Icon Theme
+
+```bash
+# Use Nerd Font icons
+voxtype status --format json --icon-theme nerd-font
+
+# Use text labels
+voxtype status --format json --icon-theme text
+# Output: {"text": "IDLE", ...}
+
+# Use custom theme file
+voxtype status --format json --icon-theme ~/.config/voxtype/my-theme.toml
+```
+
+### Follow Mode (Continuous Output)
+
+```bash
+# Watch status changes (useful for debugging)
+voxtype status --follow
+# Output:
+# idle
+# recording
+# transcribing
+# idle
+
+# JSON follow mode (Waybar exec)
+voxtype status --follow --format json
+```
+
+Each state change prints a new line. When the daemon stops, outputs `stopped` state.
+
+### Scripting
+
+```bash
+# Check if daemon is running
+if [ "$(voxtype status)" = "stopped" ]; then
+  echo "Voxtype daemon is not running"
+  exit 1
+fi
+
+# Wait for transcription to complete
+while [ "$(voxtype status)" = "transcribing" ]; do
+  sleep 0.5
+done
+
+# Get current backend (requires jq)
+voxtype status --format json --extended | jq -r '.backend'
+# Output: GPU (Vulkan)
+```
+
+## Requirements
+
+### State File Configuration
+
+The `status` command requires `state_file` to be configured in `config.toml`:
+
+```toml
+state_file = "auto"
+```
+
+- `"auto"` - Automatically uses `$XDG_RUNTIME_DIR/voxtype/state` or `/run/user/<uid>/voxtype/state`
+- `"/path/to/file"` - Custom path
+- Not set - The `status` command will error with setup instructions
+
+**Example error:**
+
+```
+Error: state_file is not configured.
+
+To enable status monitoring, add to your config.toml:
+
+  state_file = "auto"
+
+This enables external integrations like Waybar to monitor voxtype state.
+```
+
+### Daemon Detection
+
+The command checks if the daemon is actually running by verifying:
+1. The PID file exists (`$XDG_RUNTIME_DIR/voxtype/pid`)
+2. The process is alive (`/proc/<pid>` exists)
+
+If either check fails, the state is reported as `stopped` (even if a stale state file exists).
+
+## Icon Themes
+
+Built-in icon themes:
+
+| Theme | Idle | Recording | Transcribing | Stopped |
+|-------|------|-----------|--------------|----------|
+| emoji | 🎤 | 🔴 | ⚙️ | 💤 |
+| nerd-font |  |  |  |  |
+| material |  |  |  |  |
+| phosphor |  |  |  |  |
+| codicons | $(mic) | $(circle-filled) | $(sync~spin) | $(debug-pause) |
+| omarchy | 󰍬 | 󰑊 | 󱤿 | 󰒲 |
+| minimal | [ ] | [*] | [...] | [_] |
+| dots | ○ | ● | ◉ | ◌ |
+| arrows | ▶ | ⏺ | ⏸ | ⏹ |
+| text | IDLE | REC | PROC | STOP |
+
+Custom themes are TOML files:
+
+```toml
+idle = "🎙️"
+recording = "⏺️"
+transcribing = "🔄"
+stopped = "⏹️"
+```
+
+## Notes
+
+- **State file updates:** The daemon writes to the state file on every state change. The `--follow` mode uses inotify to watch for changes efficiently (no polling).
+- **Waybar caching:** Waybar may cache the module output. Reload with `pkill -SIGUSR2 waybar` after config changes.
+- **Process detection:** If the daemon crashes, followers will detect the stopped state within 500ms via the polling interval.
+- **Performance:** Follow mode uses minimal CPU (inotify-based, not polling).
+
+## See Also
+
+- [voxtype setup waybar](/commands/setup) - Install Waybar integration
+- [voxtype config](/commands/config) - Show full configuration
+- [Integrations](/features/integrations) - Detailed Waybar setup

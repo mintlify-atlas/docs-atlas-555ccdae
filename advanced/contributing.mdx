@@ -1,0 +1,388 @@
+---
+title: Contributing
+description: How to contribute to Voxtype development
+---
+
+Thank you for your interest in contributing to Voxtype! This guide will help you get started.
+
+## Ways to Contribute
+
+- **Report bugs** - Open an issue describing the bug
+- **Request features** - Open an issue describing the feature
+- **Submit code** - Fork, make changes, and submit a pull request
+- **Improve documentation** - Help make the docs clearer
+- **Help others** - Answer questions in discussions
+
+## Development Setup
+
+### Prerequisites
+
+- **Rust** (stable, 1.70+)
+- **Linux** with Wayland or X11
+- **Build dependencies:**
+
+<Tabs>
+  <Tab title="Arch Linux">
+    ```bash
+    sudo pacman -S base-devel clang alsa-lib
+    ```
+  </Tab>
+  <Tab title="Ubuntu/Debian">
+    ```bash
+    sudo apt install build-essential libclang-dev libasound2-dev
+    ```
+  </Tab>
+  <Tab title="Fedora">
+    ```bash
+    sudo dnf install @development-tools clang-devel alsa-lib-devel
+    ```
+  </Tab>
+</Tabs>
+
+### Building from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/peteonrails/voxtype
+cd voxtype
+
+# Build debug version (faster compilation)
+cargo build
+
+# Build release version
+cargo build --release
+
+# Run tests
+cargo test
+
+# Run with verbose output
+cargo run -- -vv
+```
+
+### GPU Acceleration (Optional)
+
+For faster transcription, build with GPU support:
+
+<Tabs>
+  <Tab title="Vulkan">
+    ```bash
+    # Install Vulkan runtime
+    # Arch:
+    sudo pacman -S vulkan-icd-loader
+    # Ubuntu:
+    sudo apt install libvulkan1
+    # Fedora:
+    sudo dnf install vulkan-loader
+    
+    # Build with Vulkan support
+    cargo build --release --features gpu-vulkan
+    ```
+  </Tab>
+  <Tab title="CUDA">
+    ```bash
+    # Install CUDA toolkit first, then:
+    cargo build --release --features gpu-cuda
+    ```
+  </Tab>
+  <Tab title="ROCm/HIP">
+    ```bash
+    # Install ROCm, then:
+    cargo build --release --features gpu-hipblas
+    ```
+  </Tab>
+</Tabs>
+
+## Code Structure
+
+Voxtype follows a modular, trait-based architecture:
+
+### Core Traits
+
+- **`HotkeyListener`** - Hotkey detection (evdev, compositor bindings)
+- **`AudioCapture`** - Audio input (cpal, PipeWire, PulseAudio)
+- **`Transcriber`** - Speech-to-text (Whisper, ONNX engines, remote API)
+- **`TextOutput`** - Text delivery (wtype, dotool, ydotool, clipboard)
+
+Each trait has multiple implementations, making the system easily extensible.
+
+### Key Components
+
+| Component | Purpose |
+|-----------|----------|
+| `src/daemon.rs` | Main event loop with async task coordination |
+| `src/state.rs` | State machine: Idle → Recording → Transcribing → Outputting |
+| `src/config.rs` | Configuration parsing and validation |
+| `src/hotkey/` | Keyboard input detection |
+| `src/audio/` | Audio capture and playback |
+| `src/transcribe/` | Transcription backends |
+| `src/output/` | Text output drivers |
+| `src/text/` | Text processing (replacements, punctuation) |
+
+See the [Architecture](/advanced/architecture) page for details.
+
+## Development Workflow
+
+### Running Tests
+
+```bash
+# Run all tests
+cargo test
+
+# Run specific test
+cargo test test_name
+
+# Run with output visible
+cargo test -- --nocapture
+
+# Test a specific module
+cargo test text::
+```
+
+### Manual Testing
+
+```bash
+# Run with verbose logging
+cargo run -- -vv
+
+# Test transcription on audio file
+cargo run -- transcribe test.wav
+
+# Watch state changes
+cargo run -- status --follow
+
+# Test model download
+cargo run -- setup --download
+```
+
+### Code Quality
+
+Before submitting a PR:
+
+```bash
+# Format code
+cargo fmt
+
+# Run linter
+cargo clippy
+
+# Fix clippy warnings
+cargo clippy --fix
+```
+
+## Submitting Changes
+
+### For Bug Fixes
+
+1. Create an issue describing the bug
+2. Fork the repository
+3. Create a branch: `git checkout -b fix/description`
+4. Make your fix
+5. Test thoroughly
+6. Submit a pull request referencing the issue
+
+### For Features
+
+1. **Open an issue to discuss the feature first**
+2. Wait for feedback before investing significant time
+3. Fork and create a branch: `git checkout -b feature/description`
+4. Implement the feature
+5. Add tests and documentation
+6. Submit a pull request
+
+### Commit Messages
+
+Use clear, descriptive commit messages:
+
+```
+type: short description
+
+Longer description if needed. Explain what and why,
+not how (the code shows how).
+
+Fixes #123
+```
+
+**Types:** `fix`, `feat`, `docs`, `style`, `refactor`, `test`, `chore`
+
+### Pull Request Guidelines
+
+- **Keep PRs focused** - One feature or fix per PR
+- **Write tests** - Add tests for new functionality
+- **Update docs** - Update relevant documentation
+- **Follow code style** - Run `cargo fmt` and `cargo clippy`
+- **Test on your system** - Verify it works before submitting
+- **Provide context** - Explain why the change is needed
+
+## Documentation
+
+When adding user-facing features, update:
+
+- **User Manual** (`docs/USER_MANUAL.md`) - How to use the feature
+- **Configuration Guide** (`docs/CONFIGURATION.md`) - Config file options
+- **Troubleshooting** (`docs/TROUBLESHOOTING.md`) - Common issues and solutions
+- **CLI help** - Update `src/cli.rs` with clear `--help` text
+- **Website docs** - Update corresponding pages in `website/`
+
+## Code Style
+
+### Rust Conventions
+
+- Use `snake_case` for functions and variables
+- Use `PascalCase` for types and structs
+- Use `SCREAMING_SNAKE_CASE` for constants
+- Keep lines under 100 characters
+- Use descriptive variable names
+
+### Error Handling
+
+Use `thiserror` with user-friendly messages:
+
+```rust
+#[error("Cannot open input device '{0}'. Is the user in the 'input' group?\n  Run: sudo usermod -aG input $USER")]
+DeviceAccess(String),
+```
+
+Include:
+- What went wrong
+- Why it happened
+- How to fix it
+
+### Logging
+
+Use `tracing` for structured logging:
+
+```rust
+use tracing::{info, debug, warn, error};
+
+info!("Starting daemon");
+debug!(device = %device_name, "Opening audio device");
+warn!("Model not found, downloading...");
+error!(?err, "Transcription failed");
+```
+
+## Adding New Features
+
+### Adding a Transcription Backend
+
+1. Create `src/transcribe/your_backend.rs`
+2. Implement the `Transcriber` trait:
+   ```rust
+   #[async_trait]
+   pub trait Transcriber: Send + Sync {
+       async fn prepare(&mut self) -> Result<()>;
+       async fn transcribe(&mut self, audio: &[i16]) -> Result<String>;
+   }
+   ```
+3. Add to factory in `src/transcribe/mod.rs`
+4. Add config fields to `src/config.rs` with defaults
+5. Add CLI flags in `src/cli.rs`
+6. Document in `docs/CONFIGURATION.md`
+7. Add tests
+
+### Adding an Output Method
+
+1. Create `src/output/your_method.rs`
+2. Implement the `TextOutput` trait:
+   ```rust
+   #[async_trait]
+   pub trait TextOutput: Send + Sync {
+       async fn output(&mut self, text: &str) -> Result<()>;
+       fn is_available(&self) -> bool;
+   }
+   ```
+3. Add to fallback chain in `src/output/mod.rs`
+4. Consider whether it should be automatic fallback or explicit selection
+
+### Modifying Configuration
+
+<Warning>
+Backwards compatibility is critical. Never break existing installations.
+</Warning>
+
+- Add new fields with sensible defaults
+- Removed fields should be silently ignored, not cause errors
+- Test upgrades by running new version with old config file
+- Document changes in release notes
+
+## Testing Guidelines
+
+### Unit Tests
+
+Place tests at the bottom of each file:
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_something() {
+        // Test implementation
+    }
+}
+```
+
+### Integration Tests
+
+Place in `tests/` directory:
+
+```rust
+use voxtype::*;
+
+#[tokio::test]
+async fn test_end_to_end() {
+    // Test implementation
+}
+```
+
+## Best Practices
+
+- **Prefer self-documenting code** over comments
+- **Avoid allocations in hot paths** (hotkey detection, audio streaming)
+- **Use `spawn_blocking` for CPU-intensive work** (transcription)
+- **Prefer streaming over buffering** where possible
+- **Only validate at system boundaries** (user input, external APIs)
+- **Don't over-engineer** - wait for multiple use cases before abstracting
+
+## Performance Considerations
+
+- **Desktop:** Prioritize fast transcription
+- **Laptop:** Balance speed with battery efficiency
+- **Memory:** Use on-demand loading for large models
+- **GPU:** Provide isolation option for memory management
+
+## Getting Help
+
+- **Questions?** Open a [discussion](https://github.com/peteonrails/voxtype/discussions)
+- **Found a bug?** Open an [issue](https://github.com/peteonrails/voxtype/issues)
+- **Read the code:** The [Developer Guide](https://github.com/peteonrails/voxtype/blob/main/CLAUDE.md) has architectural details
+
+## Maintainer Response Time
+
+I typically respond to issues and PRs within 48-72 hours. For urgent bugs affecting core functionality, mention `@peteonrails` in your issue.
+
+## Recognition
+
+If you submit code that is incorporated into Voxtype, you will be:
+
+1. Credited in commit messages with `Co-authored-by`
+2. Added to the [Contributors](https://github.com/peteonrails/voxtype#contributors) section in README
+3. Listed on the [website](https://voxtype.io)
+
+Bonus points if you include these updates in your pull request!
+
+## Code of Conduct
+
+Please read our [Code of Conduct](https://github.com/peteonrails/voxtype/blob/main/CODE_OF_CONDUCT.md). We are committed to providing a welcoming and positive experience for everyone.
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the MIT License.
+
+## Additional Resources
+
+- [Architecture Overview](/advanced/architecture) - System design details
+- [Troubleshooting Guide](/advanced/troubleshooting) - Common issues
+- [User Manual](https://github.com/peteonrails/voxtype/blob/main/docs/USER_MANUAL.md) - Feature documentation
+- [Configuration Guide](https://github.com/peteonrails/voxtype/blob/main/docs/CONFIGURATION.md) - Config reference
+- [Developer Guide](https://github.com/peteonrails/voxtype/blob/main/CLAUDE.md) - Code-level details

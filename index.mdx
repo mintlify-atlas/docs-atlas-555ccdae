@@ -1,97 +1,325 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Voxtype Documentation"
+description: "Push-to-talk voice-to-text for Linux with offline transcription and Wayland integration"
+mode: "custom"
 ---
 
-## Setting up
+<div className="relative overflow-hidden bg-gradient-to-br from-[#0F172A] via-[#1E293B] to-[#0F172A] dark:from-[#0F172A] dark:via-[#1E293B] dark:to-[#0F172A] py-20 border-b border-white/10 dark:border-white/10">
+  <div className="max-w-6xl mx-auto px-6">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+      <div className="lg:col-span-7 space-y-6">
+        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white dark:text-white leading-tight">
+          Voice to text for Linux
+        </h1>
+        <p className="text-lg sm:text-xl text-gray-300 dark:text-gray-300 max-w-2xl leading-relaxed">
+          Push-to-talk voice transcription with offline processing, GPU acceleration, and native Wayland integration. Transform speech into text instantly without sending data to the cloud.
+        </p>
+        <div className="flex flex-wrap gap-3 pt-4">
+          <a
+            href="/quickstart"
+            className="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white bg-[#040404] dark:bg-[#040404] border border-[#040404] dark:border-[#040404] rounded-lg hover:bg-[#1a1a1a] dark:hover:bg-[#1a1a1a] hover:border-[#1a1a1a] dark:hover:border-[#1a1a1a] transition-colors no-underline"
+          >
+            Get Started
+          </a>
+          <a
+            href="/commands/daemon"
+            className="inline-flex items-center justify-center px-6 py-3 text-base font-semibold text-white dark:text-white bg-white/10 dark:bg-white/10 border border-white/30 dark:border-white/30 rounded-lg hover:bg-white/20 dark:hover:bg-white/20 hover:border-white/40 dark:hover:border-white/40 transition-colors no-underline"
+          >
+            Command Reference
+          </a>
+        </div>
+      </div>
+      <div className="lg:col-span-5 flex items-center justify-center">
+        <div className="relative w-full max-w-md">
+          <div className="bg-[#1a1d27] dark:bg-[#1a1d27] border border-[#27272a] dark:border-[#27272a] rounded-2xl p-6 shadow-2xl">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 pb-2 border-b border-[#27272a] dark:border-[#27272a]">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <span className="ml-2 text-xs text-gray-400 dark:text-gray-400 font-mono">terminal</span>
+              </div>
+              <div className="font-mono text-sm space-y-2">
+                <div className="text-gray-400 dark:text-gray-400">$ voxtype</div>
+                <div className="text-green-400 dark:text-green-400">✓ Daemon started</div>
+                <div className="text-gray-400 dark:text-gray-400">Model: base.en</div>
+                <div className="text-gray-400 dark:text-gray-400">Backend: GPU (Vulkan)</div>
+                <div className="flex items-center gap-2 text-blue-400 dark:text-blue-400">
+                  <span className="animate-pulse">●</span>
+                  <span>Ready for input...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
+      Quick Start
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400">
+      Get Voxtype running on your Linux system in minutes
+    </p>
+  </div>
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+  <Steps>
+    <Step title="Install Voxtype">
+      Download and install Voxtype from the AUR (Arch), or use the provided `.deb` or `.rpm` packages for your distribution.
 
-## Make it yours
+      <CodeGroup>
+      ```bash Arch Linux
+      yay -S voxtype
+      ```
+      ```bash Debian/Ubuntu
+      wget https://github.com/peteonrails/voxtype/releases/latest/download/voxtype_*_amd64.deb
+      sudo dpkg -i voxtype_*_amd64.deb
+      ```
+      ```bash Fedora
+      wget https://github.com/peteonrails/voxtype/releases/latest/download/voxtype-*.x86_64.rpm
+      sudo dnf install voxtype-*.x86_64.rpm
+      ```
+      </CodeGroup>
+    </Step>
 
-Design a docs site that looks great and empowers your users.
+    <Step title="Install dependencies">
+      Voxtype requires a text input driver. Install `wtype` for best Unicode/CJK support on Wayland.
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+      ```bash
+      # Fedora
+      sudo dnf install wtype
 
-## Create beautiful pages
+      # Arch
+      sudo pacman -S wtype
 
-Everything you need to create world-class documentation.
+      # Ubuntu
+      sudo apt install wtype
+      ```
+    </Step>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+    <Step title="Download transcription model">
+      Download a Whisper model for offline transcription. The `base.en` model provides a good balance of speed and accuracy.
 
-## Need inspiration?
+      ```bash
+      voxtype setup --download
+      ```
+    </Step>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+    <Step title="Configure compositor keybinding">
+      Add a keybinding to your compositor for push-to-talk activation.
+
+      <Accordion title="Hyprland configuration">
+        Add to `~/.config/hypr/hyprland.conf`:
+        ```
+        bind = SUPER, V, exec, voxtype record start
+        bindr = SUPER, V, exec, voxtype record stop
+        ```
+      </Accordion>
+
+      <Accordion title="Sway configuration">
+        Add to `~/.config/sway/config`:
+        ```
+        bindsym --no-repeat $mod+v exec voxtype record start
+        bindsym --release $mod+v exec voxtype record stop
+        ```
+      </Accordion>
+
+      <Accordion title="River configuration">
+        Add to `~/.config/river/init`:
+        ```bash
+        riverctl map normal Super V spawn 'voxtype record start'
+        riverctl map -release normal Super V spawn 'voxtype record stop'
+        ```
+      </Accordion>
+
+      Then disable the built-in hotkey in your config:
+      ```toml
+      # ~/.config/voxtype/config.toml
+      [hotkey]
+      enabled = false
+      ```
+    </Step>
+
+    <Step title="Start the daemon">
+      Run Voxtype in the foreground to test, or set it up as a systemd service.
+
+      ```bash
+      # Run in foreground
+      voxtype
+
+      # Or install as systemd service
+      voxtype setup systemd
+      systemctl --user enable --now voxtype
+      ```
+
+      Hold your configured hotkey, speak, and release. Transcribed text appears at your cursor position.
+    </Step>
+  </Steps>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
+      Key Features
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400">
+      Everything you need for voice-to-text on Linux
+    </p>
+  </div>
+
+  <CardGroup cols={2}>
+    <Card title="Offline transcription" icon="microphone" href="/features/transcription-engines">
+      7 transcription engines including Whisper, Parakeet, and Moonshine. Process speech locally without internet.
+    </Card>
+    <Card title="GPU acceleration" icon="rocket" href="/features/gpu-acceleration">
+      Vulkan, CUDA, and ROCm support for sub-second inference on large models.
+    </Card>
+    <Card title="Wayland native" icon="window" href="/guides/compositor-integration">
+      First-class integration with Hyprland, Sway, and River compositors.
+    </Card>
+    <Card title="Meeting mode" icon="users" href="/features/meeting-mode">
+      Continuous transcription with speaker attribution and export to Markdown, JSON, SRT, or VTT.
+    </Card>
+    <Card title="Multiple output modes" icon="keyboard" href="/guides/output-modes">
+      Type directly, paste via clipboard, or write to files. Automatic fallback handling.
+    </Card>
+    <Card title="Text processing" icon="wand-magic-sparkles" href="/guides/text-processing">
+      Spoken punctuation, word replacements, and LLM post-processing integration.
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="mb-12">
+    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-3">
+      Explore by Topic
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400">
+      Dive deeper into Voxtype's capabilities
+    </p>
+  </div>
+
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <a
+      href="/guides/basic-usage"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#040404] dark:hover:border-[#040404] overflow-hidden transition-colors no-underline"
+    >
+      <div className="h-40 bg-gradient-to-br from-blue-500/20 to-purple-500/20 dark:from-blue-500/20 dark:to-purple-500/20 flex items-center justify-center border-b border-gray-200 dark:border-[#27272a]">
+        <svg className="w-16 h-16 text-blue-400 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+        </svg>
+      </div>
+      <div className="p-5 bg-white dark:bg-[#1a1d27]">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-[#040404] dark:group-hover:text-[#040404] transition-colors">
+          Basic Usage
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Learn push-to-talk controls, toggle mode, and how to configure your preferred hotkey.
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#040404] dark:text-[#040404] group-hover:text-[#040404] dark:group-hover:text-[#040404]">
+          Read guide
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a
+      href="/guides/configuration"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#040404] dark:hover:border-[#040404] overflow-hidden transition-colors no-underline"
+    >
+      <div className="h-40 bg-gradient-to-br from-green-500/20 to-teal-500/20 dark:from-green-500/20 dark:to-teal-500/20 flex items-center justify-center border-b border-gray-200 dark:border-[#27272a]">
+        <svg className="w-16 h-16 text-green-400 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      </div>
+      <div className="p-5 bg-white dark:bg-[#1a1d27]">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-[#040404] dark:group-hover:text-[#040404] transition-colors">
+          Configuration
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Customize models, audio settings, output behavior, and post-processing with TOML configuration.
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#040404] dark:text-[#040404] group-hover:text-[#040404] dark:group-hover:text-[#040404]">
+          Read guide
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a
+      href="/features/transcription-engines"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#040404] dark:hover:border-[#040404] overflow-hidden transition-colors no-underline"
+    >
+      <div className="h-40 bg-gradient-to-br from-orange-500/20 to-red-500/20 dark:from-orange-500/20 dark:to-red-500/20 flex items-center justify-center border-b border-gray-200 dark:border-[#27272a]">
+        <svg className="w-16 h-16 text-orange-400 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+        </svg>
+      </div>
+      <div className="p-5 bg-white dark:bg-[#1a1d27]">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-[#040404] dark:group-hover:text-[#040404] transition-colors">
+          Transcription Engines
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Choose from 7 engines: Whisper, Parakeet, Moonshine, SenseVoice, Paraformer, Dolphin, and Omnilingual.
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#040404] dark:text-[#040404] group-hover:text-[#040404] dark:group-hover:text-[#040404]">
+          Explore engines
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a
+      href="/advanced/architecture"
+      className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#040404] dark:hover:border-[#040404] overflow-hidden transition-colors no-underline"
+    >
+      <div className="h-40 bg-gradient-to-br from-purple-500/20 to-pink-500/20 dark:from-purple-500/20 dark:to-pink-500/20 flex items-center justify-center border-b border-gray-200 dark:border-[#27272a]">
+        <svg className="w-16 h-16 text-purple-400 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+      </div>
+      <div className="p-5 bg-white dark:bg-[#1a1d27]">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-[#040404] dark:group-hover:text-[#040404] transition-colors">
+          Architecture
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+          Understand Voxtype's design: hotkey detection, audio capture, transcription backends, and output drivers.
+        </p>
+        <div className="flex items-center text-sm font-medium text-[#040404] dark:text-[#040404] group-hover:text-[#040404] dark:group-hover:text-[#040404]">
+          Learn more
+          <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-2xl bg-gradient-to-br from-[#0F172A] to-[#1E293B] dark:from-[#0F172A] dark:to-[#1E293B] border border-white/10 dark:border-white/10 p-8 md:p-12 text-center">
+    <h2 className="text-3xl font-bold text-white dark:text-white mb-4">
+      Ready to get started?
+    </h2>
+    <p className="text-lg text-gray-300 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
+      Install Voxtype on your Linux system and start transcribing speech with push-to-talk voice recognition.
+    </p>
+    <a
+      href="/quickstart"
+      className="inline-flex items-center justify-center px-8 py-3 text-base font-semibold text-white bg-[#040404] dark:bg-[#040404] border border-[#040404] dark:border-[#040404] rounded-lg hover:bg-[#1a1a1a] dark:hover:bg-[#1a1a1a] hover:border-[#1a1a1a] dark:hover:border-[#1a1a1a] transition-colors no-underline"
+    >
+      Get Started
+    </a>
+  </div>
+</div>

@@ -1,0 +1,619 @@
+---
+title: 'voxtype daemon'
+description: 'Run Voxtype as a foreground daemon with hotkey detection'
+icon: 'server'
+---
+
+## Overview
+
+The daemon command starts Voxtype in its primary mode, running as a foreground process that listens for hotkey events and performs voice-to-text transcription.
+
+When no subcommand is specified, `voxtype` defaults to `voxtype daemon`.
+
+```bash
+voxtype daemon
+# or simply:
+voxtype
+```
+
+## Hotkey detection
+
+The daemon supports two hotkey detection modes:
+
+1. **Built-in evdev listener** (default) - Kernel-level hotkey detection via evdev. Requires user to be in the `input` group.
+2. **Compositor keybindings** - Use your window manager's native keybinding system (recommended for Wayland). Disable built-in detection with `--no-hotkey` and configure compositor to call `voxtype record start/stop/toggle`.
+
+### Activation modes
+
+<Tabs>
+  <Tab title="Push-to-talk">
+    Hold the hotkey to record, release to transcribe. Default behavior.
+
+    ```bash
+    voxtype daemon
+    ```
+  </Tab>
+  <Tab title="Toggle">
+    Press once to start recording, press again to stop and transcribe.
+
+    ```bash
+    voxtype daemon --toggle
+    ```
+
+    Or in `config.toml`:
+    ```toml
+    [hotkey]
+    mode = "toggle"
+    ```
+  </Tab>
+</Tabs>
+
+## Configuration
+
+All daemon settings can be configured via:
+
+1. **CLI flags** (highest priority) - Override any setting for the current session
+2. **Environment variables** - Use `VOXTYPE_*` prefix (e.g., `VOXTYPE_MODEL=large-v3-turbo`)
+3. **Config file** - `~/.config/voxtype/config.toml`
+4. **Defaults** - Built-in sensible defaults
+
+### Configuration file
+
+<ParamField path="config" type="string">
+  Path to configuration file. Defaults to `~/.config/voxtype/config.toml`.
+
+  ```bash
+  voxtype --config ~/custom-config.toml
+  ```
+</ParamField>
+
+## Verbosity and logging
+
+<ParamField path="verbose" type="flag">
+  Increase logging verbosity. Use `-v` for debug output, `-vv` for trace output.
+
+  ```bash
+  voxtype -v    # Debug level
+  voxtype -vv   # Trace level
+  ```
+</ParamField>
+
+<ParamField path="quiet" type="flag">
+  Suppress all output except errors.
+
+  ```bash
+  voxtype --quiet
+  ```
+</ParamField>
+
+## Hotkey configuration
+
+<ParamField path="hotkey" type="string">
+  Override the hotkey for recording. Examples: `SCROLLLOCK`, `PAUSE`, `F13`, `MEDIA`, `WEV_234`, `EVTEST_226`.
+
+  ```bash
+  voxtype --hotkey PAUSE
+  ```
+
+  Use `wev` (Wayland) or `evtest` (X11/Wayland) to discover key codes:
+  ```bash
+  wev | grep -A4 "key event"
+  evtest /dev/input/eventX
+  ```
+</ParamField>
+
+<ParamField path="toggle" type="flag">
+  Use toggle mode instead of push-to-talk. Press hotkey once to start recording, press again to stop.
+
+  ```bash
+  voxtype --toggle
+  ```
+</ParamField>
+
+<ParamField path="no-hotkey" type="flag">
+  Disable built-in hotkey detection. Use this when relying on compositor keybindings.
+
+  ```bash
+  voxtype --no-hotkey
+  ```
+
+  Then configure compositor keybindings:
+  ```bash
+  # Hyprland example:
+  bind = SUPER, R, exec, voxtype record toggle
+  ```
+</ParamField>
+
+<ParamField path="cancel-key" type="string">
+  Key to abort recording or transcription without outputting. Examples: `ESC`, `BACKSPACE`, `F12`.
+
+  ```bash
+  voxtype --cancel-key ESC
+  ```
+</ParamField>
+
+<ParamField path="model-modifier" type="string">
+  Modifier key for selecting secondary model during recording. Hold this key while activating the hotkey to use `secondary_model`.
+
+  ```bash
+  voxtype --model-modifier LEFTSHIFT --secondary-model large-v3-turbo
+  ```
+</ParamField>
+
+## Transcription engine
+
+<ParamField path="engine" type="string">
+  Override transcription engine. Options: `whisper`, `parakeet`, `moonshine`, `sensevoice`, `paraformer`, `dolphin`, `omnilingual`.
+
+  ```bash
+  voxtype --engine parakeet
+  ```
+</ParamField>
+
+<ParamField path="model" type="string">
+  Override model for transcription.
+
+  **Whisper models:**
+  - `tiny`, `tiny.en`
+  - `base`, `base.en`
+  - `small`, `small.en`
+  - `medium`, `medium.en`
+  - `large-v3`, `large-v3-turbo`
+
+  **Parakeet models:**
+  - `parakeet-tdt-0.6b-v3`
+  - `parakeet-tdt-0.6b-v3-int8`
+
+  ```bash
+  voxtype --model large-v3-turbo
+  ```
+</ParamField>
+
+## Whisper options
+
+<ParamField path="initial-prompt" type="string">
+  Provide context to guide transcription style, terminology, or formatting. Hints at proper nouns and conventions.
+
+  ```bash
+  voxtype --initial-prompt "Technical documentation with code terms like React, TypeScript, API."
+  ```
+</ParamField>
+
+<ParamField path="language" type="string">
+  Language for transcription. Use `auto` for detection, or specify code(s): `en`, `fr`, `es`, etc. Supports comma-separated list for multilingual: `en,fr,de`.
+
+  ```bash
+  voxtype --language en
+  voxtype --language "en,fr,es"  # Multilingual
+  ```
+</ParamField>
+
+<ParamField path="translate" type="flag">
+  Translate non-English speech to English during transcription.
+
+  ```bash
+  voxtype --translate
+  ```
+</ParamField>
+
+<ParamField path="threads" type="number">
+  Number of CPU threads for inference. Default is automatic based on CPU cores.
+
+  ```bash
+  voxtype --threads 4
+  ```
+</ParamField>
+
+<ParamField path="gpu-isolation" type="flag">
+  Run transcription in a subprocess that exits after completion, releasing GPU memory. Useful for preventing VRAM accumulation over multiple recordings.
+
+  ```bash
+  voxtype --gpu-isolation
+  ```
+
+  <Warning>Adds slight overhead (~100-300ms) per transcription. Only use if experiencing GPU memory issues.</Warning>
+</ParamField>
+
+<ParamField path="on-demand-loading" type="flag">
+  Load model when recording starts instead of keeping it loaded in memory. Reduces idle memory usage at the cost of slower first transcription.
+
+  ```bash
+  voxtype --on-demand-loading
+  ```
+</ParamField>
+
+<ParamField path="no-whisper-context-optimization" type="flag">
+  Disable automatic context window optimization for short recordings. By default, Voxtype uses smaller context windows for recordings under 10 seconds to improve speed.
+
+  ```bash
+  voxtype --no-whisper-context-optimization
+  ```
+</ParamField>
+
+<ParamField path="whisper-mode" type="string">
+  Whisper execution mode: `local` (in-process), `remote` (API), or `cli` (external binary).
+
+  ```bash
+  voxtype --whisper-mode remote
+  ```
+</ParamField>
+
+<ParamField path="secondary-model" type="string">
+  Model to use when holding the `model_modifier` key. Useful for switching to a larger/more accurate model for difficult audio.
+
+  ```bash
+  voxtype --secondary-model large-v3-turbo --model-modifier LEFTSHIFT
+  ```
+</ParamField>
+
+<ParamField path="eager-processing" type="flag">
+  Start transcribing audio chunks while recording continues. Experimental feature for faster perceived response.
+
+  ```bash
+  voxtype --eager-processing
+  ```
+</ParamField>
+
+### Remote Whisper options
+
+<ParamField path="remote-endpoint" type="string">
+  API endpoint URL for remote Whisper mode. Supports OpenAI-compatible APIs.
+
+  ```bash
+  voxtype --whisper-mode remote --remote-endpoint https://api.openai.com/v1/audio/transcriptions
+  ```
+</ParamField>
+
+<ParamField path="remote-model" type="string">
+  Model name to send to remote API.
+
+  ```bash
+  voxtype --remote-model whisper-1
+  ```
+</ParamField>
+
+<ParamField path="remote-api-key" type="string">
+  API key for remote server. Can also use `VOXTYPE_WHISPER_API_KEY` environment variable.
+
+  ```bash
+  voxtype --remote-api-key sk-...
+  # Or:
+  export VOXTYPE_WHISPER_API_KEY=sk-...
+  voxtype --whisper-mode remote
+  ```
+</ParamField>
+
+## Audio configuration
+
+<ParamField path="audio-device" type="string">
+  Audio input device name. Use `default` for system default, or specify device name from `pactl list sources` (PulseAudio/PipeWire) or `arecord -L` (ALSA).
+
+  ```bash
+  voxtype --audio-device "alsa_input.usb-Blue_Microphones_Yeti_Stereo_Microphone"
+  ```
+</ParamField>
+
+<ParamField path="max-duration" type="number">
+  Maximum recording duration in seconds (safety limit). Default is 300 seconds (5 minutes).
+
+  ```bash
+  voxtype --max-duration 600  # 10 minutes
+  ```
+</ParamField>
+
+<ParamField path="audio-feedback" type="flag">
+  Enable audio feedback sounds (beeps when recording starts/stops).
+
+  ```bash
+  voxtype --audio-feedback
+  ```
+</ParamField>
+
+<ParamField path="no-audio-feedback" type="flag">
+  Disable audio feedback sounds.
+
+  ```bash
+  voxtype --no-audio-feedback
+  ```
+</ParamField>
+
+## Output configuration
+
+<ParamField path="clipboard" type="flag">
+  Force clipboard-only output mode. Transcribed text is copied to clipboard without typing.
+
+  ```bash
+  voxtype --clipboard
+  ```
+</ParamField>
+
+<ParamField path="paste" type="flag">
+  Force paste mode: copy to clipboard and simulate Ctrl+V keystroke.
+
+  ```bash
+  voxtype --paste
+  ```
+</ParamField>
+
+<ParamField path="restore-clipboard" type="flag">
+  Save clipboard content before paste mode and restore it after paste completes. Preserves your previous clipboard state.
+
+  ```bash
+  voxtype --paste --restore-clipboard
+  ```
+</ParamField>
+
+<ParamField path="restore-clipboard-delay-ms" type="number">
+  Delay in milliseconds after paste before restoring clipboard. Default is 200ms. Increase if paste target hasn't processed the content yet.
+
+  ```bash
+  voxtype --restore-clipboard-delay-ms 500
+  ```
+</ParamField>
+
+<ParamField path="pre-type-delay" type="number">
+  Delay in milliseconds before typing starts. Helps prevent first character drop in some applications. Default is 0.
+
+  ```bash
+  voxtype --pre-type-delay 100
+  ```
+</ParamField>
+
+<ParamField path="type-delay" type="number">
+  Delay between typed characters in milliseconds. Use for applications that can't handle fast typing. Default is 0 (fastest).
+
+  ```bash
+  voxtype --type-delay 10
+  ```
+</ParamField>
+
+<ParamField path="append-text" type="string">
+  Text to append after each transcription. Applied before `auto_submit`. Useful for adding trailing spaces or punctuation.
+
+  ```bash
+  voxtype --append-text " "
+  ```
+</ParamField>
+
+<ParamField path="driver" type="string">
+  Output driver order for type mode (comma-separated). Available: `wtype`, `dotool`, `ydotool`, `clipboard`.
+
+  ```bash
+  voxtype --driver ydotool,wtype,clipboard
+  ```
+
+  Default order: `wtype → dotool → ydotool → clipboard`
+</ParamField>
+
+<ParamField path="auto-submit" type="flag">
+  Automatically press Enter after outputting transcribed text.
+
+  ```bash
+  voxtype --auto-submit
+  ```
+</ParamField>
+
+<ParamField path="no-auto-submit" type="flag">
+  Disable auto-submit (overrides config setting).
+
+  ```bash
+  voxtype --no-auto-submit
+  ```
+</ParamField>
+
+<ParamField path="shift-enter-newlines" type="flag">
+  Convert newlines in transcription to Shift+Enter instead of regular Enter. Useful for chat applications that send on Enter.
+
+  ```bash
+  voxtype --shift-enter-newlines
+  ```
+</ParamField>
+
+<ParamField path="no-shift-enter-newlines" type="flag">
+  Disable Shift+Enter newlines (overrides config).
+
+  ```bash
+  voxtype --no-shift-enter-newlines
+  ```
+</ParamField>
+
+<ParamField path="fallback-to-clipboard" type="flag">
+  Fall back to clipboard if typing fails.
+
+  ```bash
+  voxtype --fallback-to-clipboard
+  ```
+</ParamField>
+
+<ParamField path="no-fallback-to-clipboard" type="flag">
+  Disable clipboard fallback.
+
+  ```bash
+  voxtype --no-fallback-to-clipboard
+  ```
+</ParamField>
+
+<ParamField path="spoken-punctuation" type="flag">
+  Enable spoken punctuation conversion. Say "period", "comma", "question mark" to insert punctuation.
+
+  ```bash
+  voxtype --spoken-punctuation
+  ```
+</ParamField>
+
+<ParamField path="paste-keys" type="string">
+  Keystroke combination for paste mode. Examples: `ctrl+v`, `shift+insert`, `ctrl+shift+v`.
+
+  ```bash
+  voxtype --paste-keys ctrl+shift+v
+  ```
+</ParamField>
+
+<ParamField path="dotool-xkb-layout" type="string">
+  Keyboard layout for dotool output (e.g., `de`, `fr`). Used when dotool is active.
+
+  ```bash
+  voxtype --dotool-xkb-layout de
+  ```
+</ParamField>
+
+<ParamField path="dotool-xkb-variant" type="string">
+  Keyboard layout variant for dotool (e.g., `nodeadkeys`).
+
+  ```bash
+  voxtype --dotool-xkb-variant nodeadkeys
+  ```
+</ParamField>
+
+<ParamField path="file-path" type="string">
+  File path for file output mode. Used with `--file` in record commands or when output mode is set to file.
+
+  ```bash
+  voxtype --file-path ~/transcriptions.txt
+  ```
+</ParamField>
+
+<ParamField path="file-mode" type="string">
+  File write mode: `overwrite` or `append`.
+
+  ```bash
+  voxtype --file-mode append
+  ```
+</ParamField>
+
+<ParamField path="pre-output-command" type="string">
+  Command to run before typing output. Useful for compositor submap switching.
+
+  ```bash
+  voxtype --pre-output-command "hyprctl dispatch submap reset"
+  ```
+</ParamField>
+
+<ParamField path="post-output-command" type="string">
+  Command to run after typing output.
+
+  ```bash
+  voxtype --post-output-command "notify-send 'Transcription complete'"
+  ```
+</ParamField>
+
+<ParamField path="pre-recording-command" type="string">
+  Command to run when recording starts. Useful for visual indicators or compositor state changes.
+
+  ```bash
+  voxtype --pre-recording-command "hyprctl dispatch submap voxtype"
+  ```
+</ParamField>
+
+## Voice Activity Detection (VAD)
+
+<ParamField path="vad" type="flag">
+  Enable Voice Activity Detection to filter silence before transcription. Prevents Whisper hallucinations on silence-only recordings.
+
+  ```bash
+  voxtype --vad
+  ```
+</ParamField>
+
+<ParamField path="vad-threshold" type="number">
+  Speech detection threshold (0.0-1.0). Lower values are more sensitive. Default is 0.5.
+
+  ```bash
+  voxtype --vad --vad-threshold 0.3  # More sensitive
+  ```
+</ParamField>
+
+<ParamField path="vad-backend" type="string">
+  VAD backend to use: `auto`, `energy`, `whisper`.
+
+  - `auto` - Whisper VAD for Whisper engine, Energy for ONNX engines
+  - `energy` - Simple RMS-based detection, no model needed
+  - `whisper` - Silero model via whisper-rs, requires model download
+
+  ```bash
+  voxtype --vad --vad-backend whisper
+  ```
+</ParamField>
+
+<ParamField path="vad-min-speech-ms" type="number">
+  Minimum speech duration in milliseconds for VAD to consider audio as containing speech.
+
+  ```bash
+  voxtype --vad --vad-min-speech-ms 500
+  ```
+</ParamField>
+
+## Systemd service mode
+
+Run Voxtype as a systemd user service for automatic startup:
+
+```bash
+# Install service
+voxtype setup systemd
+
+# Enable autostart
+systemctl --user enable voxtype.service
+
+# Start service
+systemctl --user start voxtype.service
+
+# Check status
+voxtype setup systemd --status
+```
+
+The service runs `voxtype daemon` with settings from your config file.
+
+## Example configurations
+
+<Tabs>
+  <Tab title="Basic usage">
+    Default settings with scroll lock hotkey:
+    ```bash
+    voxtype
+    ```
+  </Tab>
+  <Tab title="Remote Whisper">
+    Use OpenAI API for transcription:
+    ```bash
+    export VOXTYPE_WHISPER_API_KEY=sk-...
+    voxtype --whisper-mode remote \
+      --remote-endpoint https://api.openai.com/v1/audio/transcriptions \
+      --remote-model whisper-1
+    ```
+  </Tab>
+  <Tab title="Compositor bindings">
+    Disable built-in hotkey, use Hyprland bindings:
+    ```bash
+    voxtype --no-hotkey
+    ```
+
+    In `~/.config/hypr/hyprland.conf`:
+    ```
+    bind = SUPER, R, exec, voxtype record toggle
+    ```
+  </Tab>
+  <Tab title="Paste mode with clipboard restore">
+    Copy to clipboard and paste, then restore previous clipboard:
+    ```bash
+    voxtype --paste --restore-clipboard
+    ```
+  </Tab>
+  <Tab title="Multilingual">
+    Transcribe English, French, or Spanish with VAD:
+    ```bash
+    voxtype --language "en,fr,es" --vad
+    ```
+  </Tab>
+  <Tab title="GPU memory optimization">
+    Release GPU memory after each transcription:
+    ```bash
+    voxtype --gpu-isolation --on-demand-loading
+    ```
+  </Tab>
+</Tabs>
+
+## See also
+
+- [voxtype record](/commands/record) - Control recording from external sources
+- [voxtype transcribe](/commands/transcribe) - Transcribe audio files
+- [Configuration guide](/guides/configuration) - Detailed config file documentation

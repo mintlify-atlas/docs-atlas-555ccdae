@@ -1,0 +1,442 @@
+---
+title: Compositor Integration
+description: Use native compositor keybindings for push-to-talk with Hyprland, Sway, and River
+---
+
+# Compositor Integration
+
+Voxtype works best with your compositor's native keybindings. This guide covers setup for Hyprland, Sway, River, and X11 fallback.
+
+## Why Use Compositor Keybindings?
+
+Using compositor keybindings instead of the built-in evdev hotkey has several advantages:
+
+- **No special permissions** - No need to be in the `input` group
+- **Native integration** - Use familiar keybinding configuration patterns
+- **Flexible key combinations** - Use any key combination your compositor supports (e.g., Super+V, Ctrl+Alt+M)
+- **Consistent with other shortcuts** - Manage all keybindings in one place
+
+## Architecture
+
+With compositor keybindings, the flow is:
+
+```
+Compositor detects key → voxtype record start/stop → Daemon records → Text output
+```
+
+Instead of:
+
+```
+Voxtype detects key via evdev → Daemon records → Text output
+```
+
+## Basic Setup
+
+### 1. Disable Built-in Hotkey
+
+Edit `~/.config/voxtype/config.toml`:
+
+```toml
+[hotkey]
+enabled = false
+```
+
+### 2. Enable State File
+
+Required for `toggle` mode and status tracking (enabled by default):
+
+```toml
+state_file = "auto"
+```
+
+### 3. Configure Compositor Keybindings
+
+See the compositor-specific sections below.
+
+## Hyprland Setup
+
+Hyprland supports key release events via `bindr`, enabling true push-to-talk.
+
+### Push-to-Talk
+
+Add to `~/.config/hypr/hyprland.conf`:
+
+```hyprlang
+# Push-to-talk: hold to record, release to transcribe
+bind = SUPER, V, exec, voxtype record start
+bindr = SUPER, V, exec, voxtype record stop
+```
+
+You can use any key combination:
+
+```hyprlang
+# ScrollLock without modifiers
+bind = , SCROLL_LOCK, exec, voxtype record start
+bindr = , SCROLL_LOCK, exec, voxtype record stop
+
+# Multiple modifiers
+bind = SUPER CTRL, X, exec, voxtype record start
+bindr = SUPER CTRL, X, exec, voxtype record stop
+```
+
+### Toggle Mode
+
+```hyprlang
+# Press once to start, again to stop
+bind = SUPER, V, exec, voxtype record toggle
+```
+
+### Modifier Key Interference Fix (Submap)
+
+If you're using modifiers (e.g., Super+V), you may experience an issue where releasing keys slowly causes typed text to trigger window manager shortcuts. For example, with Super+V, the transcribed text "hello" might trigger Super+h, Super+e, Super+l if you release V before Super.
+
+**Automatic Fix:**
+
+```bash
+voxtype setup compositor hyprland
+hyprctl reload
+systemctl --user restart voxtype
+```
+
+This command:
+1. Creates `~/.config/hypr/conf.d/voxtype-submap.conf` with a modifier-suppressing submap
+2. Adds pre/post output hooks to your voxtype config
+3. Verifies your hyprland.conf sources `conf.d/*.conf`
+
+**Manual Setup:**
+
+View the configuration first:
+
+```bash
+voxtype setup compositor hyprland --show
+```
+
+The generated submap blocks all modifier keys during text output while allowing F12 to cancel. If voxtype crashes while typing, press **F12** to escape the submap.
+
+<Tip>
+For the most reliable experience, don't bind Escape in the voxtype_suppress submap. Some users report success with Escape by increasing `pre_type_delay_ms`, but F12 works consistently without delays.
+</Tip>
+
+### Cancel Key
+
+Add a binding to cancel recording or transcription:
+
+```hyprlang
+# Bind in the recording submap (if using automatic setup)
+submap = voxtype_recording
+bind = , F12, exec, voxtype record cancel
+submap = reset
+
+# Or bind globally
+bind = SUPER, ESCAPE, exec, voxtype record cancel
+```
+
+## Sway Setup
+
+Sway supports key release events via `--release`.
+
+### Push-to-Talk
+
+Add to `~/.config/sway/config`:
+
+```
+# Push-to-talk
+bindsym $mod+v exec voxtype record start
+bindsym --release $mod+v exec voxtype record stop
+
+# Or with --no-repeat to prevent key repeat
+bindsym --no-repeat $mod+v exec voxtype record start
+bindsym --release $mod+v exec voxtype record stop
+```
+
+### Toggle Mode
+
+```
+bindsym $mod+v exec voxtype record toggle
+```
+
+### Modifier Key Interference Fix (Mode)
+
+**Automatic Fix:**
+
+```bash
+voxtype setup compositor sway
+swaymsg reload
+systemctl --user restart voxtype
+```
+
+This creates a mode in `~/.config/sway/conf.d/voxtype-mode.conf` that blocks modifiers during text output.
+
+**Manual Setup:**
+
+```bash
+voxtype setup compositor sway --show
+```
+
+### Cancel Key
+
+```
+# In the recording mode (if using automatic setup)
+mode "voxtype_recording" {
+    bindsym F12 exec voxtype record cancel, mode "default"
+}
+
+# Or bind globally
+bindsym $mod+Escape exec voxtype record cancel
+```
+
+## River Setup
+
+River supports key release events via `-release`.
+
+### Push-to-Talk
+
+Add to `~/.config/river/init`:
+
+```bash
+# Push-to-talk
+riverctl map normal Super V spawn 'voxtype record start'
+riverctl map -release normal Super V spawn 'voxtype record stop'
+```
+
+### Toggle Mode
+
+```bash
+riverctl map normal Super V spawn 'voxtype record toggle'
+```
+
+### Modifier Key Interference Fix (Mode)
+
+**Automatic Fix:**
+
+```bash
+voxtype setup compositor river
+# Restart River or source the new config
+systemctl --user restart voxtype
+```
+
+This creates mode definitions in `~/.config/river/conf.d/voxtype-mode.sh`.
+
+**Manual Setup:**
+
+```bash
+voxtype setup compositor river --show
+```
+
+### Cancel Key
+
+```bash
+riverctl map voxtype_recording None F12 spawn 'voxtype record cancel'
+riverctl map voxtype_recording None F12 enter-mode normal
+```
+
+## X11 Fallback (evdev)
+
+Compositors that don't support key release events (or X11 window managers) should use the built-in evdev hotkey.
+
+### Prerequisites
+
+Add yourself to the `input` group:
+
+```bash
+sudo usermod -aG input $USER
+# Log out and back in
+```
+
+### Configuration
+
+```toml
+[hotkey]
+enabled = true  # Enable evdev hotkey detection
+key = "SCROLLLOCK"
+mode = "push_to_talk"  # or "toggle"
+```
+
+The evdev approach works on:
+- X11 window managers (i3, bspwm, etc.)
+- Wayland compositors without key-release support
+- Any Linux desktop as a universal fallback
+
+<Note>
+The evdev hotkey cannot use Super/Meta modifiers on some compositors (like KDE Plasma) because the compositor grabs those combinations before they reach evdev. Use compositor keybindings instead, or choose a non-modifier key like ScrollLock, Pause, or F13-F24.
+</Note>
+
+## Troubleshooting Compositor-Specific Issues
+
+### Hyprland: Typed text triggers shortcuts
+
+**Problem:** When using Super+V, releasing V before Super causes typed characters to trigger Super+{key} shortcuts.
+
+**Solution:** Use the automatic submap fix:
+
+```bash
+voxtype setup compositor hyprland
+hyprctl reload
+systemctl --user restart voxtype
+```
+
+See the [Modifier Key Interference](#modifier-key-interference-fix-submap) section above.
+
+### Sway: No key release detection
+
+**Problem:** Push-to-talk doesn't work, transcription starts immediately.
+
+**Solution:** Ensure you're using `--release` flag:
+
+```
+bindsym $mod+v exec voxtype record start
+bindsym --release $mod+v exec voxtype record stop
+```
+
+### River: Multiple key presses trigger multiple recordings
+
+**Problem:** Key repeat causes multiple `voxtype record start` commands.
+
+**Solution:** River doesn't have a built-in `--no-repeat` flag. Use a script wrapper:
+
+```bash
+#!/bin/bash
+# ~/.config/river/voxtype-start.sh
+if ! pgrep -f "voxtype.*recording" > /dev/null; then
+    voxtype record start
+fi
+```
+
+Then bind to the script:
+
+```bash
+riverctl map normal Super V spawn '~/.config/river/voxtype-start.sh'
+```
+
+### Toggle mode not working
+
+**Problem:** `voxtype record toggle` doesn't toggle state.
+
+**Solution:** Ensure `state_file` is enabled:
+
+```toml
+state_file = "auto"
+```
+
+And restart the daemon:
+
+```bash
+systemctl --user restart voxtype
+```
+
+### Cancel command does nothing
+
+**Problem:** `voxtype record cancel` doesn't cancel recording.
+
+**Solution:** The cancel command sends a signal to the daemon. Ensure the daemon is running:
+
+```bash
+voxtype setup systemd --status
+```
+
+If the daemon isn't running, start it:
+
+```bash
+systemctl --user start voxtype
+```
+
+## Advanced: Output Mode Overrides
+
+You can override the output mode per recording:
+
+```bash
+# Output to clipboard instead of typing (just this recording)
+voxtype record start --clipboard
+voxtype record stop
+
+# Use paste mode (clipboard + Ctrl+V)
+voxtype record start --paste
+voxtype record stop
+
+# Write to a file
+voxtype record start --file=notes.txt
+voxtype record stop
+```
+
+Bind different keys to different modes:
+
+```hyprlang
+# Hyprland example
+bind = SUPER, V, exec, voxtype record start           # Type mode (default)
+bindr = SUPER, V, exec, voxtype record stop
+
+bind = SUPER, C, exec, voxtype record start --clipboard  # Clipboard mode
+bindr = SUPER, C, exec, voxtype record stop
+```
+
+See the [Output Modes guide](/guides/output-modes) for details.
+
+## Advanced: Model Selection per Recording
+
+Override the model for a specific recording:
+
+```bash
+voxtype record start --model large-v3-turbo
+voxtype record stop
+```
+
+Bind different keys to different models:
+
+```hyprlang
+# Hyprland example
+bind = SUPER, V, exec, voxtype record start --model base.en
+bindr = SUPER, V, exec, voxtype record stop
+
+bind = SUPER SHIFT, V, exec, voxtype record start --model large-v3-turbo
+bindr = SUPER SHIFT, V, exec, voxtype record stop
+```
+
+## Verifying the Setup
+
+After configuring your compositor:
+
+1. **Check daemon status:**
+   ```bash
+   voxtype status
+   ```
+
+2. **Test recording:**
+   - Press your hotkey
+   - Check status: `voxtype status` should show "recording"
+   - Release (or press again for toggle)
+   - Status should show "transcribing", then "idle"
+
+3. **Check logs:**
+   ```bash
+   journalctl --user -u voxtype -f
+   ```
+
+4. **Test with verbose output:**
+   ```bash
+   # Stop the service temporarily
+   systemctl --user stop voxtype
+   
+   # Run in foreground with debug output
+   voxtype -vv
+   
+   # Test your keybindings
+   # Then restart the service
+   systemctl --user start voxtype
+   ```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="sliders" href="/guides/configuration">
+    Fine-tune audio, models, and output settings
+  </Card>
+  <Card title="Output Modes" icon="keyboard" href="/guides/output-modes">
+    Choose between typing, clipboard, paste, and file output
+  </Card>
+  <Card title="Text Processing" icon="wand-magic-sparkles" href="/guides/text-processing">
+    Post-process transcriptions with LLMs and word replacements
+  </Card>
+  <Card title="Basic Usage" icon="book-open" href="/guides/basic-usage">
+    Return to basic usage guide
+  </Card>
+</CardGroup>

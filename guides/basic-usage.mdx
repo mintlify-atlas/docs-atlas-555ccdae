@@ -1,0 +1,333 @@
+---
+title: Basic Usage
+description: Learn how to use Voxtype for push-to-talk voice-to-text on Linux
+---
+
+# Basic Usage
+
+Voxtype is a push-to-talk voice-to-text tool for Linux. This guide covers the essential workflows for daily use.
+
+## The Push-to-Talk Workflow
+
+1. **Start the daemon**: Run `voxtype` in a terminal or enable the systemd service
+2. **Hold your hotkey**: Default is ScrollLock
+3. **Speak clearly**: Talk at a normal pace
+4. **Release the hotkey**: Your speech is transcribed
+5. **Text appears**: Either typed at cursor or copied to clipboard
+
+<Tip>
+For best results, speak naturally and avoid long pauses. Whisper works best with continuous speech rather than isolated words.
+</Tip>
+
+## Running the Daemon
+
+### Foreground Mode
+
+Run the daemon directly in a terminal:
+
+```bash
+voxtype                     # Run with defaults
+voxtype -v                  # Verbose output
+voxtype -vv                 # Debug output
+voxtype --clipboard         # Force clipboard mode
+voxtype --model small.en    # Use a different model
+voxtype --hotkey PAUSE      # Use different hotkey
+```
+
+### Systemd Service
+
+For automatic startup on login:
+
+```bash
+# Install the systemd service
+voxtype setup systemd
+
+# Start the service
+systemctl --user start voxtype
+
+# Enable on login
+systemctl --user enable voxtype
+
+# Check status
+voxtype setup systemd --status
+```
+
+The service runs in the background and logs to the systemd journal:
+
+```bash
+journalctl --user -u voxtype -f  # Follow logs
+```
+
+## Push-to-Talk vs Toggle Mode
+
+Voxtype supports two activation modes:
+
+### Push-to-Talk (Default)
+
+Hold the hotkey to record, release to transcribe:
+
+```toml
+[hotkey]
+key = "SCROLLLOCK"
+mode = "push_to_talk"  # Default
+```
+
+This mode provides precise control over recording duration. It's ideal when you know exactly what you want to say.
+
+### Toggle Mode
+
+Press once to start recording, press again to stop:
+
+```toml
+[hotkey]
+key = "SCROLLLOCK"
+mode = "toggle"
+```
+
+Or use the CLI flag:
+
+```bash
+voxtype --toggle
+```
+
+Toggle mode is useful for longer dictation where holding a key would be uncomfortable.
+
+## Using the Built-in Hotkey
+
+The built-in hotkey uses evdev (Linux input subsystem) to detect key presses. This works on both Wayland and X11.
+
+### Prerequisites
+
+You must be in the `input` group:
+
+```bash
+# Add yourself to the input group
+sudo usermod -aG input $USER
+
+# Log out and back in for changes to take effect
+
+# Verify membership
+groups | grep input
+```
+
+### Default Hotkey
+
+The default hotkey is **ScrollLock**. This is chosen because:
+- It's rarely used for other purposes
+- It doesn't interfere with normal typing
+- It's available on most keyboards
+
+### Changing the Hotkey
+
+Edit `~/.config/voxtype/config.toml`:
+
+```toml
+[hotkey]
+key = "PAUSE"  # Or F13-F24, RIGHTALT, etc.
+```
+
+See the [Configuration guide](/guides/configuration) for all available keys.
+
+## Using Compositor Keybindings
+
+Instead of the built-in evdev hotkey, you can use your compositor's native keybindings. This has several advantages:
+
+- **No `input` group membership required**
+- **Use any key combination** (e.g., Super+V)
+- **Native feel** with familiar keybinding configuration
+
+### Setup
+
+1. Disable the built-in hotkey in `~/.config/voxtype/config.toml`:
+
+```toml
+[hotkey]
+enabled = false
+```
+
+2. Configure your compositor. See the [Compositor Integration guide](/guides/compositor-integration) for detailed setup instructions.
+
+## Canceling Recording or Transcription
+
+You can cancel an active recording or transcription in progress without outputting any text.
+
+### With Built-in Hotkey
+
+Configure a cancel key in your config:
+
+```toml
+[hotkey]
+key = "SCROLLLOCK"
+cancel_key = "ESC"  # Press Escape to cancel
+```
+
+Common cancel keys:
+- `ESC` - Escape key
+- `BACKSPACE` - Backspace key  
+- `F12` - Function key
+
+### With Compositor Keybindings
+
+Bind a key to the cancel command:
+
+```bash
+voxtype record cancel
+```
+
+**Example (Hyprland):**
+```hyprlang
+bind = , ESCAPE, exec, voxtype record cancel
+```
+
+**Example (Sway):**
+```
+bindsym Escape exec voxtype record cancel
+```
+
+<Warning>
+If voxtype crashes while typing, the cancel key (or command) will not work. Use the compositor's escape mechanism if available (see the [Compositor Integration guide](/guides/compositor-integration)).
+</Warning>
+
+## Model Selection and Switching
+
+Voxtype supports multiple Whisper models with different trade-offs between speed and accuracy.
+
+### Default Model
+
+The default model is `base.en`, which provides a good balance:
+
+```toml
+[whisper]
+model = "base.en"
+```
+
+### Available Models
+
+| Model | Size | Speed | Accuracy | Languages |
+|-------|------|-------|----------|----------|
+| `tiny.en` | 39 MB | Fastest | Good | English only |
+| `base.en` | 142 MB | Fast | Better | English only |
+| `small.en` | 466 MB | Medium | Great | English only |
+| `medium.en` | 1.5 GB | Slow | Excellent | English only |
+| `large-v3` | 3.1 GB | Slowest | Best | 99 languages |
+| `large-v3-turbo` | 1.6 GB | Fast | Excellent | 99 languages (GPU recommended) |
+
+### Switching Models
+
+Change the model in your config:
+
+```toml
+[whisper]
+model = "large-v3-turbo"
+```
+
+Or override at runtime:
+
+```bash
+voxtype --model large-v3-turbo
+```
+
+### Interactive Model Selection
+
+Use the setup command for guided selection:
+
+```bash
+voxtype setup model
+```
+
+This will:
+1. Show all available models
+2. Download your selection if needed
+3. Update your config file
+4. Optionally restart the daemon
+
+### Multi-Model Support
+
+You can configure multiple models and switch between them:
+
+```toml
+[whisper]
+model = "base.en"  # Primary model
+secondary_model = "large-v3-turbo"  # For difficult audio
+available_models = ["medium.en"]  # Additional models
+```
+
+See the [Configuration guide](/guides/configuration) for details on multi-model configuration.
+
+## Audio Feedback
+
+Enable audio cues when recording starts and stops:
+
+```toml
+[audio.feedback]
+enabled = true
+theme = "default"  # or "subtle", "mechanical"
+volume = 0.7       # 0.0 to 1.0
+```
+
+### Built-in Themes
+
+- **default** - Clear, pleasant two-tone beeps
+- **subtle** - Quiet, unobtrusive clicks  
+- **mechanical** - Typewriter/keyboard-like sounds
+
+### Custom Themes
+
+Point to a directory containing `start.wav`, `stop.wav`, and `error.wav`:
+
+```toml
+[audio.feedback]
+enabled = true
+theme = "/home/user/.config/voxtype/sounds"
+volume = 0.8
+```
+
+## Example Session
+
+```
+$ voxtype
+[INFO] Voxtype v0.7.0 starting...
+[INFO] Using model: base.en
+[INFO] Hotkey: SCROLLLOCK
+[INFO] Output mode: type (fallback: clipboard)
+[INFO] Ready! Hold SCROLLLOCK to record.
+
+# User holds ScrollLock and says "Hello world"
+[INFO] Recording started...
+[INFO] Recording stopped (1.2s)
+[INFO] Transcribing...
+[INFO] Transcribed: "Hello world"
+[INFO] Typed 11 characters
+```
+
+## Common CLI Options
+
+| Option | Description |
+|--------|-------------|
+| `-v, -vv` | Increase verbosity (debug, trace) |
+| `-q, --quiet` | Quiet mode (errors only) |
+| `--clipboard` | Force clipboard mode |
+| `--paste` | Force paste mode (clipboard + Ctrl+V) |
+| `--model <MODEL>` | Override transcription model |
+| `--engine <ENGINE>` | Override transcription engine (whisper, parakeet, moonshine, etc.) |
+| `--hotkey <KEY>` | Override hotkey |
+| `--toggle` | Use toggle mode |
+| `--no-hotkey` | Disable built-in hotkey (use compositor keybindings) |
+| `-c, --config <FILE>` | Use custom config file |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Compositor Integration" icon="window" href="/guides/compositor-integration">
+    Set up push-to-talk with Hyprland, Sway, or River
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/guides/configuration">
+    Customize hotkeys, models, and output settings
+  </Card>
+  <Card title="Output Modes" icon="keyboard" href="/guides/output-modes">
+    Choose between typing, clipboard, paste, and file output
+  </Card>
+  <Card title="Text Processing" icon="wand-magic-sparkles" href="/guides/text-processing">
+    Post-process transcriptions with LLMs and word replacements
+  </Card>
+</CardGroup>

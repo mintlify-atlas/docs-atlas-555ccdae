@@ -1,0 +1,508 @@
+---
+title: "Installation"
+description: "Install Voxtype on your Linux distribution"
+icon: "download"
+---
+
+Complete installation guide for all supported Linux distributions.
+
+## System requirements
+
+<Tabs>
+  <Tab title="Minimum">
+    - **OS:** Linux with glibc 2.35+ (Ubuntu 24.04+, Fedora 39+, Arch, Debian Trixie+)
+    - **Desktop:** Wayland or X11
+    - **Audio:** PipeWire or PulseAudio
+    - **CPU:** x86_64 with AVX2 support
+    - **RAM:** 1 GB available
+    - **Disk:** 500 MB for base.en model
+  </Tab>
+  <Tab title="Recommended">
+    - **OS:** Rolling release (Arch, Fedora latest)
+    - **Desktop:** Wayland compositor (Hyprland, Sway, River)
+    - **Audio:** PipeWire
+    - **CPU:** Modern CPU with AVX-512 support
+    - **GPU:** Vulkan-compatible (AMD, NVIDIA, Intel)
+    - **RAM:** 4 GB available
+    - **Disk:** 3 GB for large-v3 model
+  </Tab>
+</Tabs>
+
+<Warning>
+Voxtype requires glibc 2.35 or newer. Older distributions (Ubuntu 22.04, Debian Bullseye) are not supported.
+</Warning>
+
+## Package installation
+
+<Tabs>
+  <Tab title="Arch Linux">
+    ### AUR packages
+
+    Two packages are available:
+
+    **voxtype** - Build from source (recommended)
+    ```bash
+    yay -S voxtype
+    ```
+
+    **voxtype-bin** - Prebuilt binary
+    ```bash
+    yay -S voxtype-bin
+    ```
+
+    The AUR packages include:
+    - Systemd service file
+    - Shell completions (bash, zsh, fish)
+    - Man pages
+    - Configuration examples
+
+    ### Post-installation
+
+    Enable and start the service:
+    ```bash
+    systemctl --user enable --now voxtype
+    ```
+  </Tab>
+
+  <Tab title="Debian/Ubuntu">
+    ### Download and install
+
+    ```bash
+    # Download latest release
+    wget https://github.com/peteonrails/voxtype/releases/latest/download/voxtype_VERSION_amd64.deb
+
+    # Install package
+    sudo dpkg -i voxtype_VERSION_amd64.deb
+
+    # Install dependencies if needed
+    sudo apt install -f
+    ```
+
+    Replace `VERSION` with the actual version number (e.g., `0.6.3`).
+
+    ### Available binaries
+
+    The `.deb` package includes multiple binaries for different CPU/GPU configurations:
+    - `voxtype` - AVX2 (CPU only)
+    - `voxtype-avx512` - AVX-512 (faster CPU)
+    - `voxtype-vulkan` - Vulkan GPU acceleration
+    - `voxtype-onnx-*` - ONNX engine variants
+
+    Use `voxtype setup gpu` to switch between CPU and GPU variants.
+  </Tab>
+
+  <Tab title="Fedora">
+    ### Download and install
+
+    ```bash
+    # Download latest release
+    wget https://github.com/peteonrails/voxtype/releases/latest/download/voxtype-VERSION.x86_64.rpm
+
+    # Install package
+    sudo dnf install voxtype-VERSION.x86_64.rpm
+    ```
+
+    Replace `VERSION` with the actual version number (e.g., `0.6.3-1`).
+
+    ### Available binaries
+
+    The `.rpm` package includes multiple binaries for different configurations. Use `voxtype setup gpu` and `voxtype setup onnx` to switch between them.
+  </Tab>
+
+  <Tab title="Other distributions">
+    ### Manual binary installation
+
+    ```bash
+    # Download binary for your CPU/GPU
+    wget https://github.com/peteonrails/voxtype/releases/latest/download/voxtype-VERSION-linux-x86_64-avx2
+
+    # Make executable
+    chmod +x voxtype-VERSION-linux-x86_64-avx2
+
+    # Move to PATH
+    sudo mv voxtype-VERSION-linux-x86_64-avx2 /usr/local/bin/voxtype
+    ```
+
+    Available binaries:
+    - `avx2` - Standard CPU (Intel/AMD)
+    - `avx512` - AVX-512 capable CPUs
+    - `vulkan` - GPU acceleration via Vulkan
+    - `onnx-avx2`, `onnx-avx512`, `onnx-cuda`, `onnx-rocm` - ONNX engine variants
+  </Tab>
+</Tabs>
+
+## Build from source
+
+Building from source gives you the most control and latest features.
+
+### Prerequisites
+
+<CodeGroup>
+```bash Fedora
+sudo dnf install rust cargo alsa-lib-devel
+```
+```bash Arch
+sudo pacman -S rust alsa-lib
+```
+```bash Ubuntu
+sudo apt install cargo libasound2-dev
+```
+</CodeGroup>
+
+### Build steps
+
+```bash
+# Clone repository
+git clone https://github.com/peteonrails/voxtype.git
+cd voxtype
+
+# Build release binary
+cargo build --release
+
+# Binary is at: target/release/voxtype
+```
+
+### Build with GPU acceleration
+
+<Tabs>
+  <Tab title="Vulkan">
+    ```bash
+    cargo build --release --features gpu-vulkan
+    ```
+
+    Supports AMD, NVIDIA, and Intel GPUs.
+  </Tab>
+  <Tab title="CUDA">
+    ```bash
+    # Install CUDA toolkit first
+    cargo build --release --features gpu-cuda
+    ```
+
+    NVIDIA GPUs only. Requires CUDA 11.x or newer.
+  </Tab>
+  <Tab title="ROCm">
+    ```bash
+    # Install ROCm first
+    cargo build --release --features gpu-hipblas
+    ```
+
+    AMD GPUs only. Requires ROCm 5.x or newer.
+  </Tab>
+  <Tab title="Metal">
+    ```bash
+    cargo build --release --features gpu-metal
+    ```
+
+    macOS/Apple Silicon only (not applicable for Linux).
+  </Tab>
+</Tabs>
+
+### Install binary
+
+```bash
+# Install to /usr/local/bin
+sudo install -m 755 target/release/voxtype /usr/local/bin/
+
+# Verify installation
+voxtype --version
+```
+
+## Runtime dependencies
+
+Voxtype requires a text input driver and clipboard utility.
+
+### Text input drivers
+
+Install at least one:
+
+<Tabs>
+  <Tab title="wtype (recommended)">
+    **Best Unicode/CJK support, works on most Wayland compositors**
+
+    <CodeGroup>
+    ```bash Fedora
+    sudo dnf install wtype
+    ```
+    ```bash Arch
+    sudo pacman -S wtype
+    ```
+    ```bash Ubuntu
+    sudo apt install wtype
+    ```
+    </CodeGroup>
+
+    <Note>
+    wtype does not work on KDE Plasma or GNOME Wayland. Use dotool or ydotool instead.
+    </Note>
+  </Tab>
+
+  <Tab title="dotool">
+    **Keyboard layout support via XKB, works everywhere**
+
+    <CodeGroup>
+    ```bash Fedora
+    sudo dnf install dotool
+    ```
+    ```bash Arch
+    yay -S dotool-bin
+    ```
+    ```bash Ubuntu
+    # Build from source
+    wget https://git.sr.ht/~geb/dotool/archive/master.tar.gz
+    tar xf master.tar.gz
+    cd dotool-master
+    make
+    sudo make install
+    ```
+    </CodeGroup>
+
+    Configure keyboard layout:
+    ```toml
+    # ~/.config/voxtype/config.toml
+    [output]
+    dotool_xkb_layout = "de"  # Your layout (de, fr, es, etc.)
+    ```
+  </Tab>
+
+  <Tab title="ydotool">
+    **Universal fallback, works on Wayland/X11/TTY**
+
+    <CodeGroup>
+    ```bash Fedora
+    sudo dnf install ydotool
+    systemctl --user enable --now ydotool
+    ```
+    ```bash Arch
+    sudo pacman -S ydotool
+    systemctl --user enable --now ydotool
+    ```
+    ```bash Ubuntu
+    sudo apt install ydotool
+    systemctl --user enable --now ydotool
+    ```
+    </CodeGroup>
+
+    <Warning>
+    ydotool requires a daemon. Enable it with systemd or the typing will not work.
+    </Warning>
+  </Tab>
+</Tabs>
+
+### Clipboard utilities
+
+For clipboard fallback and paste mode:
+
+<CodeGroup>
+```bash Wayland
+# Fedora
+sudo dnf install wl-clipboard
+
+# Arch
+sudo pacman -S wl-clipboard
+
+# Ubuntu
+sudo apt install wl-clipboard
+```
+```bash X11
+# Should already be installed
+xclip  # or xsel
+```
+</CodeGroup>
+
+### Audio system
+
+One of these should already be installed:
+
+- **PipeWire** (recommended, modern)
+- **PulseAudio** (older systems)
+
+Verify:
+```bash
+pactl info  # Should show server info
+```
+
+## Permissions
+
+### Compositor keybindings (recommended)
+
+**No special permissions needed.** Just configure your compositor and disable the built-in hotkey:
+
+```toml
+# ~/.config/voxtype/config.toml
+[hotkey]
+enabled = false
+```
+
+### Built-in hotkey (evdev)
+
+If using the built-in hotkey on X11 or as a fallback:
+
+```bash
+# Add yourself to input group
+sudo usermod -aG input $USER
+
+# Log out and back in for changes to take effect
+```
+
+Then verify:
+```bash
+groups  # Should list 'input'
+```
+
+## Download models
+
+Voxtype needs a transcription model to work.
+
+### Default model
+
+```bash
+# Download base.en (142 MB)
+voxtype setup --download
+```
+
+### Specific model
+
+```bash
+# Download a specific model
+voxtype setup --download --model large-v3-turbo
+
+# Interactive selection
+voxtype setup model
+```
+
+### Available models
+
+| Model | Size | Languages | Best for |
+|-------|------|-----------|----------|
+| tiny.en | 39 MB | English | Testing, low resources |
+| base.en | 142 MB | English | General use |
+| small.en | 466 MB | English | Better accuracy |
+| medium.en | 1.5 GB | English | High accuracy |
+| large-v3 | 3 GB | 99 languages | Multilingual |
+| large-v3-turbo | 1.6 GB | 99 languages | Fast + accurate (GPU) |
+
+Models are stored in `~/.local/share/voxtype/`.
+
+## Verify installation
+
+Run the setup check:
+
+```bash
+voxtype setup
+```
+
+Expected output:
+```
+Checking system configuration...
+
+✓ Voxtype binary found
+✓ Model found: base.en
+✓ Audio system: PipeWire
+✓ Text output: wtype (Wayland)
+✓ Clipboard: wl-copy
+
+All checks passed! Ready to use voxtype.
+```
+
+## Configure compositor
+
+See the [Quick Start](/quickstart#configure-compositor-keybinding) guide for compositor-specific keybinding setup.
+
+## Optional: Systemd service
+
+Run Voxtype as a systemd user service to start automatically:
+
+```bash
+# Install service file
+voxtype setup systemd
+
+# Enable and start
+systemctl --user enable --now voxtype
+
+# Check status
+systemctl --user status voxtype
+
+# View logs
+journalctl --user -u voxtype -f
+```
+
+The service uses your config from `~/.config/voxtype/config.toml`.
+
+## Optional: Waybar integration
+
+Add status bar integration:
+
+```bash
+# Show configuration
+voxtype setup waybar
+
+# Auto-install to ~/.config/waybar/
+voxtype setup waybar --install
+```
+
+See [Integrations](/features/integrations) for full Waybar setup.
+
+## Upgrade
+
+<Tabs>
+  <Tab title="AUR">
+    ```bash
+    yay -Syu voxtype
+    ```
+  </Tab>
+  <Tab title="Package">
+    Download and install the latest `.deb` or `.rpm` package.
+  </Tab>
+  <Tab title="Source">
+    ```bash
+    cd voxtype
+    git pull
+    cargo build --release
+    sudo install -m 755 target/release/voxtype /usr/local/bin/
+    ```
+  </Tab>
+</Tabs>
+
+## Uninstall
+
+<Tabs>
+  <Tab title="AUR">
+    ```bash
+    yay -R voxtype
+    ```
+  </Tab>
+  <Tab title="Debian/Ubuntu">
+    ```bash
+    sudo dpkg -r voxtype
+    ```
+  </Tab>
+  <Tab title="Fedora">
+    ```bash
+    sudo dnf remove voxtype
+    ```
+  </Tab>
+  <Tab title="Manual">
+    ```bash
+    sudo rm /usr/local/bin/voxtype
+    rm -rf ~/.config/voxtype
+    rm -rf ~/.local/share/voxtype
+    ```
+  </Tab>
+</Tabs>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Configure and test your installation
+  </Card>
+  <Card title="Basic usage" icon="keyboard" href="/guides/basic-usage">
+    Learn push-to-talk controls
+  </Card>
+  <Card title="GPU acceleration" icon="rocket" href="/features/gpu-acceleration">
+    Enable GPU for faster transcription
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/advanced/troubleshooting">
+    Fix common installation issues
+  </Card>
+</CardGroup>

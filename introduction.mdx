@@ -1,0 +1,152 @@
+---
+title: "Introduction"
+description: "Welcome to Voxtype - Push-to-talk voice-to-text for Linux"
+icon: "wave"
+---
+
+## What is Voxtype?
+
+Voxtype is a push-to-talk voice-to-text application for Linux that transforms your speech into text with a simple hotkey press. Hold your configured key, speak naturally, release, and watch your words appear at your cursor position.
+
+<CardGroup cols={2}>
+  <Card title="Offline by default" icon="lock">
+    Process speech locally using Whisper and other engines. No internet required.
+  </Card>
+  <Card title="Wayland native" icon="window">
+    First-class integration with Hyprland, Sway, and River compositors.
+  </Card>
+  <Card title="7 transcription engines" icon="microchip">
+    Choose from Whisper, Parakeet, Moonshine, SenseVoice, Paraformer, Dolphin, and Omnilingual.
+  </Card>
+  <Card title="GPU accelerated" icon="rocket">
+    Vulkan, CUDA, and ROCm support for sub-second inference on large models.
+  </Card>
+</CardGroup>
+
+## How it works
+
+Voxtype uses a simple push-to-talk workflow:
+
+1. **Hold your hotkey** - Default is ScrollLock, or configure your compositor to use Super+V
+2. **Speak naturally** - Audio is captured from your microphone
+3. **Release the key** - Transcription begins using your chosen engine
+4. **Text appears** - Output is typed at your cursor, copied to clipboard, or written to a file
+
+The entire process happens locally on your machine by default, with no data sent to external servers.
+
+## Key features
+
+### Multiple transcription engines
+
+Choose from 7 different speech-to-text engines optimized for different languages and use cases:
+
+- **Whisper** (default) - 99 languages, excellent accuracy
+- **Parakeet** - Fast English transcription
+- **Moonshine** - Edge devices, low memory
+- **SenseVoice** - Chinese, Japanese, Korean
+- **Paraformer** - Chinese-English bilingual
+- **Dolphin** - 40 languages + Chinese dialects
+- **Omnilingual** - 1600+ languages
+
+<Tip>
+See [Transcription Engines](/features/transcription-engines) for a complete comparison and recommendations.
+</Tip>
+
+### Compositor integration
+
+Voxtype integrates natively with Wayland compositors using their keybinding systems. This provides push-to-talk without requiring special permissions:
+
+- **Hyprland** - Full support with submap integration
+- **Sway** - Mode-based integration for clean modifier handling
+- **River** - Native mode support
+- **X11** - Evdev fallback with input group permission
+
+<Note>
+Compositor integration is recommended over the built-in hotkey for better reliability and no permission requirements.
+</Note>
+
+### Flexible output modes
+
+Choose how transcribed text reaches its destination:
+
+- **Type mode** - Simulates keyboard input (wtype, dotool, or ydotool)
+- **Clipboard mode** - Copies text to clipboard
+- **Paste mode** - Copies and simulates Ctrl+V
+- **File mode** - Writes directly to a file
+
+Each mode supports automatic fallback if the primary method fails.
+
+### Meeting mode
+
+Record longer sessions with continuous transcription, speaker attribution, and export capabilities:
+
+- Chunked processing for long recordings
+- Speaker identification and labeling
+- Export to Markdown, JSON, SRT, or VTT
+- AI summarization with Ollama integration
+
+## System requirements
+
+<Tabs>
+  <Tab title="Minimum">
+    - **OS:** Linux with glibc 2.35+ (Ubuntu 24.04, Fedora 39, Arch, Debian Trixie)
+    - **Desktop:** Wayland or X11
+    - **Audio:** PipeWire or PulseAudio
+    - **CPU:** x86_64 with AVX2 support
+    - **RAM:** 1 GB available
+    - **Disk:** 500 MB for base.en model
+  </Tab>
+  <Tab title="Recommended">
+    - **OS:** Rolling release (Arch, Fedora latest)
+    - **Desktop:** Wayland compositor (Hyprland, Sway, River)
+    - **Audio:** PipeWire
+    - **CPU:** Modern CPU with AVX-512
+    - **GPU:** Vulkan-compatible (AMD, NVIDIA, Intel)
+    - **RAM:** 4 GB available
+    - **Disk:** 3 GB for large-v3 model
+  </Tab>
+</Tabs>
+
+## Use cases
+
+<CardGroup cols={2}>
+  <Card title="Dictation" icon="comment">
+    Write emails, documents, and code by voice. Faster than typing for long-form content.
+  </Card>
+  <Card title="Accessibility" icon="universal-access">
+    Hands-free text input for users with mobility challenges or RSI.
+  </Card>
+  <Card title="Meeting notes" icon="users">
+    Record and transcribe meetings with speaker identification and export.
+  </Card>
+  <Card title="Multilingual" icon="language">
+    Support for 1600+ languages including CJK, with translation to English.
+  </Card>
+</CardGroup>
+
+## Design principles
+
+Voxtype is built with these core principles:
+
+1. **Privacy first** - All processing happens locally by default
+2. **Wayland native** - First-class compositor integration
+3. **Performance matters** - GPU acceleration for real-time transcription
+4. **Extensible** - Multiple engines, output modes, and post-processing options
+5. **Keyboard-driven** - Pure CLI interface, no GUI required
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Get Voxtype running in 5 minutes
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Install on your distribution
+  </Card>
+  <Card title="Basic usage" icon="keyboard" href="/guides/basic-usage">
+    Learn push-to-talk controls
+  </Card>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Customize to your workflow
+  </Card>
+</CardGroup>

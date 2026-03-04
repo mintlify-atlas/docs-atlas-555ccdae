@@ -1,0 +1,434 @@
+---
+title: GPU Acceleration
+description: Speed up transcription with GPU-accelerated inference
+---
+
+GPU acceleration can dramatically improve transcription speed, making even the largest models fast enough for real-time dictation.
+
+## Why GPU Acceleration Matters
+
+Without GPU acceleration, transcription speed is limited by CPU performance. For short dictation this is usually fine, but longer recordings or large models can take several seconds to transcribe.
+
+With GPU acceleration:
+
+- **Large models become practical**: `large-v3-turbo` runs in under a second instead of 15+ seconds
+- **Better battery life**: GPU is more power-efficient than maxing out CPU
+- **Lower latency**: Sub-second transcription feels instant
+
+### Performance Comparison
+
+Example on AMD RX 6800:
+
+| Model | CPU (8-core) | Vulkan GPU |
+|-------|--------------|------------|
+| base.en | ~7x realtime | ~35x realtime |
+| large-v3 | ~1x realtime | ~5x realtime |
+
+For a 5-second recording:
+- **CPU**: `base.en` ~0.7s, `large-v3` ~5s
+- **GPU**: `base.en` ~0.14s, `large-v3` ~1s
+
+## Supported Backends
+
+Voxtype supports multiple GPU backends depending on how you build or install it.
+
+| Backend | Hardware | Packages | Build Flag |
+|---------|----------|----------|------------|
+| **Vulkan** | AMD, NVIDIA, Intel | Included in packages | `--features gpu-vulkan` |
+| **CUDA** | NVIDIA | Build from source | `--features gpu-cuda` |
+| **Metal** | Apple Silicon | Build from source | `--features gpu-metal` |
+| **ROCm/HIP** | AMD | Build from source | `--features gpu-hipblas` |
+
+### Vulkan (Recommended)
+
+Vulkan works across all major GPU vendors and is included in the official packages.
+
+**Supported GPUs**:
+- AMD Radeon RX 5000+, Vega
+- NVIDIA GTX 900+, RTX series
+- Intel Arc, Iris Xe
+
+**Advantages**:
+- Cross-platform: Works on AMD, NVIDIA, and Intel
+- Included in packages: No need to build from source
+- Good compatibility: Broad driver support
+
+**Install Vulkan runtime** (if not already present):
+
+```bash
+# Arch
+sudo pacman -S vulkan-icd-loader
+
+# Ubuntu/Debian
+sudo apt install libvulkan1
+
+# Fedora
+sudo dnf install vulkan-loader
+```
+
+### CUDA (NVIDIA)
+
+CUDA provides the best performance on NVIDIA GPUs but requires building from source.
+
+**Supported GPUs**: NVIDIA GTX 900+, RTX series, Tesla, Quadro
+
+**Advantages**:
+- Fastest on NVIDIA hardware
+- Most mature GPU acceleration in whisper.cpp
+
+**Building with CUDA**:
+
+```bash
+# Install CUDA Toolkit first
+# Visit https://developer.nvidia.com/cuda-downloads
+
+cargo build --release --features gpu-cuda
+```
+
+### Metal (macOS)
+
+Metal is the native GPU API for macOS and Apple Silicon.
+
+**Supported hardware**: M1, M2, M3 chips
+
+**Building with Metal**:
+
+```bash
+cargo build --release --features gpu-metal
+```
+
+### ROCm/HIP (AMD)
+
+ROCm is AMD's alternative to CUDA for compute workloads.
+
+**Supported GPUs**: AMD Radeon RX 5000+, Vega, Instinct
+
+**Building with ROCm**:
+
+```bash
+# Install ROCm first
+# Visit https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation-Guide.html
+
+cargo build --release --features gpu-hipblas
+```
+
+**Note**: For AMD GPUs on Linux, Vulkan is usually easier and performs nearly as well.
+
+## Enabling GPU Acceleration
+
+### Using Packages (Vulkan)
+
+The packaged binaries include a Vulkan-enabled variant. Use the setup tool to switch:
+
+```bash
+# Check current status
+voxtype setup gpu
+
+# Enable GPU acceleration (switches to Vulkan binary)
+sudo voxtype setup gpu --enable
+
+# Switch back to CPU
+sudo voxtype setup gpu --disable
+```
+
+Restart the daemon:
+
+```bash
+systemctl --user restart voxtype
+```
+
+### Manual Binary Selection
+
+If you downloaded binaries manually:
+
+```bash
+# Check available GPU binaries in releases:
+# voxtype-*-vulkan      - Vulkan (AMD/NVIDIA/Intel)
+# voxtype-*-avx2        - CPU-only
+# voxtype-*-avx512      - CPU-only (AVX-512)
+
+# Install the Vulkan binary
+sudo cp voxtype-*-vulkan /usr/local/bin/voxtype
+sudo chmod +x /usr/local/bin/voxtype
+
+# Restart daemon
+systemctl --user restart voxtype
+```
+
+### Building from Source
+
+```bash
+# Vulkan (AMD, NVIDIA, Intel)
+cargo build --release --features gpu-vulkan
+
+# CUDA (NVIDIA)
+cargo build --release --features gpu-cuda
+
+# Metal (macOS/Apple Silicon)
+cargo build --release --features gpu-metal
+
+# ROCm/HIP (AMD)
+cargo build --release --features gpu-hipblas
+
+# Install
+sudo cp target/release/voxtype /usr/local/bin/
+```
+
+## Verifying GPU Acceleration
+
+Check the daemon logs to confirm GPU is active:
+
+```bash
+journalctl --user -u voxtype --since "1 minute ago" | grep -i gpu
+# Should show: "GPU: Vulkan" or "GPU: CUDA" or similar
+```
+
+Or use the status command with extended info:
+
+```bash
+voxtype status --format json --extended
+```
+
+Look for the `backend` field:
+```json
+{
+  "backend": "Vulkan (AMD Radeon RX 6800)"
+}
+```
+
+## GPU Memory Management
+
+GPU-accelerated models load into VRAM and stay resident by default for fast repeated transcriptions.
+
+### On-Demand Loading
+
+Free GPU memory when not transcribing:
+
+```toml
+[whisper]
+model = "large-v3-turbo"
+on_demand_loading = true  # Load model only when recording starts
+```
+
+**Trade-off**: Adds 1-3 seconds latency per recording (model load time), but frees VRAM between uses.
+
+### GPU Isolation Mode
+
+Run transcription in a subprocess that exits after each recording, fully releasing GPU memory:
+
+```toml
+[whisper]
+model = "large-v3-turbo"
+gpu_isolation = true  # Subprocess exits after transcription
+```
+
+**When to use GPU isolation**:
+- Laptops with hybrid graphics (discrete GPU can power down)
+- Battery life is a priority
+- Running multiple GPU applications
+
+**Performance impact**:
+
+Benchmarks on AMD Radeon RX 7800 XT with `large-v3-turbo`:
+
+| Mode | Transcription Latency | Idle RAM | Idle GPU Memory |
+|------|----------------------|----------|----------------|
+| Standard | 0.49s avg | ~1.6 GB | 409 MB |
+| GPU Isolation | 0.50s avg | 0 | 0 |
+
+The model loads while you speak (0.38-0.42s), so the additional latency is only ~10ms (2%). The subprocess approach releases all GPU resources between recordings.
+
+### Choosing Memory Settings
+
+| Scenario | Recommendation |
+|----------|---------------|
+| Desktop with dedicated GPU | Default (keep model loaded) |
+| Laptop with discrete GPU | `gpu_isolation = true` |
+| Limited VRAM | `on_demand_loading = true` |
+| Running other GPU apps | `gpu_isolation = true` or `on_demand_loading = true` |
+| Want instant response | Default |
+
+## Multi-GPU Systems
+
+If you have multiple GPUs, you can select which one to use.
+
+### AMD (Vulkan)
+
+Set the `VOXTYPE_VULKAN_DEVICE` environment variable:
+
+```bash
+# List available GPUs
+vulkaninfo | grep deviceName
+
+# Select AMD GPU
+export VOXTYPE_VULKAN_DEVICE=amd
+systemctl --user restart voxtype
+
+# Select Intel GPU
+export VOXTYPE_VULKAN_DEVICE=intel
+
+# Select NVIDIA GPU
+export VOXTYPE_VULKAN_DEVICE=nvidia
+```
+
+Make it persistent by adding to `~/.config/voxtype/voxtype.env` (if using systemd service).
+
+### NVIDIA (CUDA)
+
+CUDA automatically selects GPU 0. To use a different GPU:
+
+```bash
+export CUDA_VISIBLE_DEVICES=1  # Use second GPU
+systemctl --user restart voxtype
+```
+
+## Troubleshooting
+
+### GPU not detected
+
+**Symptom**: Logs show "CPU" backend instead of "Vulkan" or "CUDA"
+
+**Solutions**:
+
+1. Verify you're using a GPU-enabled binary:
+   ```bash
+   voxtype --version
+   # Should mention "vulkan" or "cuda" in build info
+   ```
+
+2. Check Vulkan drivers are installed:
+   ```bash
+   vulkaninfo | head -20
+   # Should show available devices
+   ```
+
+3. Verify GPU is accessible:
+   ```bash
+   # AMD/Intel
+   ls -la /dev/dri/
+   
+   # NVIDIA
+   nvidia-smi
+   ```
+
+### Poor GPU performance
+
+**Check for CPU fallback**: If the GPU backend fails to initialize, whisper.cpp silently falls back to CPU.
+
+View full logs:
+```bash
+voxtype -vv  # Very verbose mode
+# Look for GPU initialization errors
+```
+
+**Possible causes**:
+- Old GPU drivers
+- Insufficient VRAM (need ~2GB for large models)
+- GPU in use by another application
+
+### "Out of memory" errors
+
+**Reduce model size or enable memory management**:
+
+```toml
+[whisper]
+model = "base.en"           # Smaller model
+on_demand_loading = true    # Or enable on-demand loading
+```
+
+### Hybrid graphics laptop issues
+
+**Ensure discrete GPU is active**:
+
+```bash
+# Check which GPU is being used
+voxtype status --format json --extended
+# Look at "backend" field
+
+# Force discrete GPU (NVIDIA Optimus)
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia voxtype
+
+# Force discrete GPU (AMD switchable graphics)
+DRI_PRIME=1 voxtype
+```
+
+For systemd service, add to `~/.config/systemd/user/voxtype.service.d/override.conf`:
+```ini
+[Service]
+Environment="DRI_PRIME=1"
+```
+
+## Benchmarking
+
+Test transcription speed with a sample file:
+
+```bash
+# Record a test clip
+arecord -d 5 -f S16_LE -r 16000 test.wav
+
+# Benchmark
+time voxtype transcribe test.wav
+```
+
+Compare CPU vs GPU:
+
+```bash
+# CPU binary
+time ./voxtype-avx2 transcribe test.wav
+
+# GPU binary
+time ./voxtype-vulkan transcribe test.wav
+```
+
+## ONNX Engine GPU Support
+
+The ONNX engines (Parakeet, Moonshine, SenseVoice, etc.) also support GPU acceleration via ONNX Runtime.
+
+### CUDA-accelerated ONNX
+
+Download the CUDA-enabled ONNX binary:
+
+```bash
+# From releases page:
+voxtype-*-onnx-cuda
+```
+
+Or build from source:
+
+```bash
+cargo build --release --features parakeet-cuda
+cargo build --release --features moonshine-cuda
+```
+
+### ROCm-accelerated ONNX
+
+```bash
+# Download binary
+voxtype-*-onnx-rocm
+
+# Or build
+cargo build --release --features parakeet-rocm
+```
+
+### Performance
+
+ONNX engines with GPU acceleration:
+
+| Engine | CPU | CUDA GPU |
+|--------|-----|----------|
+| Parakeet TDT | ~30x realtime | ~80x realtime |
+| Moonshine base | ~40x realtime | ~120x realtime |
+
+## Best Practices
+
+1. **Use Vulkan for most cases**: Works across AMD, NVIDIA, Intel with good performance
+2. **CUDA for NVIDIA**: Slightly faster if you're building from source
+3. **Enable GPU isolation on laptops**: Saves battery when not transcribing
+4. **Use large models with GPU**: Take advantage of the speed to get better accuracy
+5. **Test before committing**: Try GPU acceleration with your hardware to ensure it helps
+
+## Further Reading
+
+- [Transcription Engines](/features/transcription-engines) - Choose the right engine
+- [Configuration guide](/guides/configuration) - GPU settings documentation
+- [Troubleshooting Guide](https://github.com/peteonrails/voxtype/blob/main/docs/TROUBLESHOOTING.md) - Common GPU issues

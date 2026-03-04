@@ -1,0 +1,497 @@
+---
+title: "voxtype meeting"
+description: "Continuous meeting transcription with speaker attribution and export"
+---
+
+## Overview
+
+Meeting mode provides continuous transcription for calls and meetings, automatically chunking audio into manageable segments with speaker attribution and export capabilities.
+
+**Prerequisites:**
+- Meeting mode must be enabled in `config.toml`:
+  ```toml
+  [meeting]
+  enabled = true
+  chunk_duration_secs = 30
+  retain_audio = false
+  max_duration_mins = 180
+  ```
+
+**Key features:**
+- Continuous recording with chunked transcription (30-second chunks by default)
+- Speaker attribution via microphone/loopback audio sources
+- Export to multiple formats: text, markdown, JSON, SRT, VTT
+- AI-powered summarization via Ollama
+- Meeting history with SQLite storage
+
+## Subcommands
+
+### start
+
+Start a new meeting transcription.
+
+```bash
+voxtype meeting start [--title "Meeting Title"]
+```
+
+<ParamField path="--title, -t" type="string">
+  Optional meeting title. If not provided, defaults to "Meeting YYYY-MM-DD HH:MM".
+</ParamField>
+
+**Example:**
+```bash
+voxtype meeting start --title "Team Standup"
+```
+
+The meeting will be assigned a unique UUID and begin recording immediately.
+
+---
+
+### stop
+
+Stop the current meeting and finalize the transcript.
+
+```bash
+voxtype meeting stop
+```
+
+Saves the transcript to storage and marks the meeting as completed.
+
+---
+
+### pause
+
+Pause recording for the current meeting.
+
+```bash
+voxtype meeting pause
+```
+
+Recording can be resumed later with `voxtype meeting resume`.
+
+---
+
+### resume
+
+Resume a paused meeting.
+
+```bash
+voxtype meeting resume
+```
+
+Continues recording from where it was paused.
+
+---
+
+### status
+
+Show the current meeting status.
+
+```bash
+voxtype meeting status
+```
+
+Displays whether a meeting is active, paused, or idle, along with duration and chunk count.
+
+---
+
+### list
+
+List past meetings from storage.
+
+```bash
+voxtype meeting list [--limit N]
+```
+
+<ParamField path="--limit, -l" type="number" default="10">
+  Maximum number of meetings to display. Set to 0 to show all meetings.
+</ParamField>
+
+**Example:**
+```bash
+voxtype meeting list --limit 20
+```
+
+Displays meetings ordered by start time (most recent first).
+
+---
+
+### export
+
+Export a meeting transcript to various formats.
+
+```bash
+voxtype meeting export <meeting_id> [--format FORMAT] [--output FILE] [--timestamps] [--speakers] [--metadata]
+```
+
+<ParamField path="meeting_id" type="string" required>
+  Meeting UUID or "latest" for the most recent meeting.
+</ParamField>
+
+<ParamField path="--format, -f" type="string" default="markdown">
+  Output format. Options: `text`, `markdown`, `json`, `srt`, `vtt`.
+</ParamField>
+
+<ParamField path="--output, -o" type="path">
+  Output file path. If not specified, writes to stdout.
+</ParamField>
+
+<ParamField path="--timestamps" type="boolean">
+  Include timestamps in the output (format-dependent).
+</ParamField>
+
+<ParamField path="--speakers" type="boolean">
+  Include speaker labels in the output.
+</ParamField>
+
+<ParamField path="--metadata" type="boolean">
+  Include meeting metadata header (title, date, duration, model).
+</ParamField>
+
+**Export formats:**
+
+| Format | Extension | Description |
+|--------|-----------|-------------|
+| text | .txt | Plain text transcript |
+| markdown | .md | Markdown with formatting |
+| json | .json | Structured JSON with all data |
+| srt | .srt | SubRip subtitle format |
+| vtt | .vtt | WebVTT subtitle format |
+
+**Example:**
+```bash
+# Export latest meeting as markdown to file
+voxtype meeting export latest --format markdown --output meeting.md --speakers --metadata
+
+# Export as JSON with all details
+voxtype meeting export <meeting-id> --format json --output transcript.json --timestamps --speakers
+
+# Export as SRT subtitles
+voxtype meeting export latest --format srt --output subtitles.srt --timestamps
+```
+
+---
+
+### show
+
+Display details for a specific meeting.
+
+```bash
+voxtype meeting show <meeting_id>
+```
+
+<ParamField path="meeting_id" type="string" required>
+  Meeting UUID or "latest" for the most recent meeting.
+</ParamField>
+
+Shows meeting metadata including title, duration, status, chunk count, and storage path.
+
+---
+
+### delete
+
+Delete a meeting and its associated files.
+
+```bash
+voxtype meeting delete <meeting_id> [--force]
+```
+
+<ParamField path="meeting_id" type="string" required>
+  Meeting UUID to delete.
+</ParamField>
+
+<ParamField path="--force, -f" type="boolean">
+  Skip confirmation prompt.
+</ParamField>
+
+**Example:**
+```bash
+# With confirmation prompt
+voxtype meeting delete abc123def456
+
+# Skip confirmation
+voxtype meeting delete abc123def456 --force
+```
+
+---
+
+### label
+
+Assign human-readable names to auto-detected speaker IDs.
+
+```bash
+voxtype meeting label <meeting_id> <speaker_id> <label>
+```
+
+<ParamField path="meeting_id" type="string" required>
+  Meeting UUID or "latest" for the most recent meeting.
+</ParamField>
+
+<ParamField path="speaker_id" type="string" required>
+  Speaker ID to label (e.g., "SPEAKER_00" or just "0").
+</ParamField>
+
+<ParamField path="label" type="string" required>
+  Human-readable label to assign (e.g., "Alice", "Bob").
+</ParamField>
+
+**Example:**
+```bash
+# Label speaker 0 as Alice
+voxtype meeting label latest 0 Alice
+
+# Label speaker 1 as Bob using full ID format
+voxtype meeting label abc123def456 SPEAKER_01 Bob
+```
+
+Labels are applied to existing transcript segments and saved to the database.
+
+---
+
+### summarize
+
+Generate an AI summary of a meeting using Ollama or a remote API.
+
+```bash
+voxtype meeting summarize <meeting_id> [--format FORMAT] [--output FILE]
+```
+
+<ParamField path="meeting_id" type="string" required>
+  Meeting UUID or "latest" for the most recent meeting.
+</ParamField>
+
+<ParamField path="--format, -f" type="string" default="markdown">
+  Output format. Options: `text`, `json`, `markdown`.
+</ParamField>
+
+<ParamField path="--output, -o" type="path">
+  Output file path. If not specified, writes to stdout.
+</ParamField>
+
+**Example:**
+```bash
+# Generate markdown summary
+voxtype meeting summarize latest --format markdown --output summary.md
+
+# Generate JSON with action items
+voxtype meeting summarize abc123def456 --format json --output summary.json
+```
+
+The summary includes:
+- Brief meeting overview
+- Key discussion points
+- Action items with assignees
+- Decisions made
+
+## Complete Workflow Example
+
+Here's a complete workflow for recording, labeling, and exporting a meeting:
+
+```bash
+# 1. Start a meeting
+voxtype meeting start --title "Sprint Planning"
+
+# 2. Recording happens automatically as you speak...
+#    Meeting transcribes in 30-second chunks
+
+# 3. Pause if needed
+voxtype meeting pause
+
+# 4. Resume when ready
+voxtype meeting resume
+
+# 5. Stop when finished
+voxtype meeting stop
+
+# 6. List recent meetings
+voxtype meeting list --limit 5
+
+# 7. Label speakers (if using ML diarization)
+voxtype meeting label latest 0 Alice
+voxtype meeting label latest 1 Bob
+
+# 8. Export transcript
+voxtype meeting export latest --format markdown --speakers --metadata --output sprint-planning.md
+
+# 9. Generate AI summary
+voxtype meeting summarize latest --output summary.md
+```
+
+## Configuration
+
+Meeting mode is configured in `config.toml`:
+
+```toml
+[meeting]
+# Enable meeting mode
+enabled = true
+
+# Duration of each audio chunk in seconds
+chunk_duration_secs = 30
+
+# Retain raw audio files (default: false)
+retain_audio = false
+
+# Maximum meeting duration in minutes (0 = unlimited)
+max_duration_mins = 180
+
+# Storage path (default: ~/.local/share/voxtype/meetings)
+# storage_path = "auto"
+```
+
+**Storage structure:**
+
+```
+~/.local/share/voxtype/meetings/
+├── index.db                     # SQLite database with meeting metadata
+└── 2024-01-15-team-standup/     # Meeting directory
+    ├── metadata.json            # Meeting metadata
+    ├── transcript.json          # Full transcript
+    └── audio/                   # Raw audio chunks (if retain_audio = true)
+```
+
+## Speaker Attribution
+
+Meeting mode supports two speaker attribution methods:
+
+### Phase 2: Dual Audio Sources (Current)
+
+Uses microphone and loopback audio to distinguish between local speaker ("You") and remote participants ("Remote").
+
+**Configuration:**
+```toml
+[audio]
+# Microphone for your voice
+device = "default"
+
+# Loopback device for remote audio (virtual device)
+loopback_device = "alsa_output.pci-0000_00_1f.3.analog-stereo.monitor"
+```
+
+### Phase 3: ML Diarization (Future)
+
+Automatic speaker detection using machine learning models. Speaker IDs like `SPEAKER_00` can be labeled with the `label` command.
+
+## Export Format Details
+
+### Text Format
+
+Plain text with optional timestamps and speaker labels.
+
+```
+[00:15] Alice: Let's start with the budget review.
+[00:32] Bob: The Q4 numbers look solid.
+```
+
+### Markdown Format
+
+Formatted transcript with headers and speaker sections.
+
+```markdown
+# Team Standup - 2024-01-15
+
+**Duration:** 45 minutes
+**Model:** whisper
+
+## Transcript
+
+**Alice**: Let's start with the budget review.
+
+**Bob**: The Q4 numbers look solid.
+```
+
+### JSON Format
+
+Complete structured data with all metadata and segments.
+
+```json
+{
+  "metadata": {
+    "id": "abc123...",
+    "title": "Team Standup",
+    "started_at": "2024-01-15T10:00:00Z",
+    "duration_secs": 2700
+  },
+  "transcript": {
+    "segments": [
+      {
+        "id": 0,
+        "start_ms": 15000,
+        "end_ms": 18000,
+        "text": "Let's start with the budget review.",
+        "source": "microphone",
+        "speaker_label": "Alice"
+      }
+    ]
+  }
+}
+```
+
+### SRT Format (SubRip)
+
+Standard subtitle format for video editors.
+
+```
+1
+00:00:15,000 --> 00:00:18,000
+Alice: Let's start with the budget review.
+
+2
+00:00:32,000 --> 00:00:37,000
+Bob: The Q4 numbers look solid.
+```
+
+### VTT Format (WebVTT)
+
+Web-compatible subtitle format.
+
+```
+WEBVTT
+
+00:00:15.000 --> 00:00:18.000
+<v Alice>Let's start with the budget review.
+
+00:00:32.000 --> 00:00:37.000
+<v Bob>The Q4 numbers look solid.
+```
+
+## Troubleshooting
+
+### Meeting won't start
+
+Ensure meeting mode is enabled in `config.toml`:
+```toml
+[meeting]
+enabled = true
+```
+
+### No speaker attribution
+
+Phase 2 dual audio requires a loopback device configured. Check your audio configuration:
+```bash
+voxtype config
+```
+
+### Chunks not processing
+
+Check chunk duration and VAD threshold:
+```toml
+[meeting]
+chunk_duration_secs = 30  # Try shorter chunks
+
+[vad]
+threshold = 0.01  # Lower = more sensitive
+```
+
+### Storage path issues
+
+Verify the storage directory is writable:
+```bash
+ls -la ~/.local/share/voxtype/meetings/
+```
+
+## See Also
+
+- [Configuration guide](/guides/configuration) - Microphone and loopback setup
+- [Configuration guide](/guides/configuration) - Voice activity detection tuning
+- See the meeting mode export formats above - Export format specifications

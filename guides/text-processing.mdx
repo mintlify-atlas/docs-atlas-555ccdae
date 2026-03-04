@@ -1,0 +1,644 @@
+---
+title: Text Processing
+description: Post-process transcriptions with word replacements, spoken punctuation, LLMs, and custom scripts
+---
+
+# Text Processing
+
+Voxtype can transform transcribed text before output using word replacements, spoken punctuation, LLM-based cleanup, and custom scripts.
+
+## Word Replacements
+
+Fix commonly misheard words and phrases.
+
+### Basic Configuration
+
+```toml
+[text]
+replacements = { "vox type" = "voxtype", "oh marky" = "Omarchy" }
+```
+
+Matching is case-insensitive:
+- "vox type" → "voxtype"
+- "Vox Type" → "voxtype"
+- "VOX TYPE" → "voxtype"
+
+### Common Use Cases
+
+**Product names:**
+
+```toml
+[text]
+replacements = {
+  "chat gpt" = "ChatGPT",
+  "github" = "GitHub",
+  "vs code" = "VS Code",
+  "post gres" = "PostgreSQL"
+}
+```
+
+**Personal names:**
+
+```toml
+[text]
+replacements = {
+  "john smith" = "John Smith",
+  "alice wonder" = "Alice Wonderland"
+}
+```
+
+**Domain terminology:**
+
+```toml
+[text]
+replacements = {
+  "docker compose" = "docker-compose",
+  "kubernetes" = "k8s",
+  "type script" = "TypeScript"
+}
+```
+
+### Multi-Line Configuration
+
+For many replacements, use multi-line TOML:
+
+```toml
+[text.replacements]
+"vox type" = "voxtype"
+"oh marky" = "Omarchy"
+"chat gpt" = "ChatGPT"
+"type script" = "TypeScript"
+"postgres" = "PostgreSQL"
+```
+
+### Order of Operations
+
+Replacements are applied:
+1. After transcription
+2. Before spoken punctuation
+3. Before post-processing commands
+4. Before output
+
+## Spoken Punctuation
+
+Convert spoken words to punctuation symbols.
+
+### Basic Configuration
+
+```toml
+[text]
+spoken_punctuation = true
+```
+
+### Supported Punctuation
+
+Say the word on the left to get the symbol on the right:
+
+| Spoken | Symbol | Spoken | Symbol |
+|--------|--------|--------|--------|
+| "period" | `.` | "comma" | `,` |
+| "question mark" | `?` | "exclamation mark" | `!` |
+| "colon" | `:` | "semicolon" | `;` |
+| "open paren" | `(` | "close paren" | `)` |
+| "open bracket" | `[` | "close bracket" | `]` |
+| "open brace" | `{` | "close brace" | `}` |
+| "open angle" | `<` | "close angle" | `>` |
+| "single quote" | `'` | "double quote" | `"` |
+| "backtick" | `` ` `` | "tilde" | `~` |
+| "slash" | `/` | "backslash" | `\` |
+| "pipe" | `|` | "ampersand" | `&` |
+| "asterisk" | `*` | "plus" | `+` |
+| "minus" | `-` | "underscore" | `_` |
+| "equals" | `=` | "percent" | `%` |
+| "dollar sign" | `$` | "at sign" | `@` |
+| "hash" | `#` | "caret" | `^` |
+| "new line" | `\n` | "new paragraph" | `\n\n` |
+
+### Examples
+
+**Basic punctuation:**
+
+Say: "Hello world period How are you question mark"
+
+Output: `Hello world. How are you?`
+
+**Code dictation:**
+
+Say: "function hello open paren close paren open brace new line return quote hello world quote semicolon new line close brace"
+
+Output:
+```javascript
+function hello() {
+  return "hello world";
+}
+```
+
+**Math expressions:**
+
+Say: "x equals a plus b asterisk c"
+
+Output: `x = a + b * c`
+
+### Developer Workflow
+
+Spoken punctuation is especially useful for developers:
+
+```toml
+[text]
+spoken_punctuation = true
+replacements = {
+  "const" = "const",
+  "let" = "let",
+  "var" = "var",
+  "function" = "function"
+}
+```
+
+Say: "const greeting equals quote hello world quote semicolon"
+
+Output: `const greeting = "hello world";`
+
+### Combining with Word Replacements
+
+Replacements are applied before spoken punctuation:
+
+```toml
+[text]
+spoken_punctuation = true
+replacements = { "vox type" = "voxtype" }
+```
+
+Say: "Welcome to vox type period"
+
+Result:
+1. Replacement: "Welcome to voxtype period"
+2. Spoken punctuation: "Welcome to voxtype."
+
+## Post-Processing with LLMs
+
+Pipe transcriptions through external commands for advanced cleanup.
+
+### How It Works
+
+1. Voxtype transcribes audio
+2. Applies word replacements and spoken punctuation
+3. Sends text to your command via stdin
+4. Command processes text (grammar, formatting, etc.)
+5. Command outputs cleaned text to stdout
+6. Voxtype uses the cleaned text for output
+
+If the command fails or times out, Voxtype falls back to the original transcription.
+
+### Basic Configuration
+
+```toml
+[output.post_process]
+command = "ollama run llama3.2:1b 'Clean up this dictation. Fix grammar, remove filler words. Output only the cleaned text:'"
+timeout_ms = 30000  # 30 seconds
+```
+
+### Ollama Examples
+
+**Basic cleanup:**
+
+```toml
+[output.post_process]
+command = "ollama run llama3.2:1b 'Clean up this dictation:'"
+timeout_ms = 30000
+```
+
+**Grammar correction:**
+
+```toml
+[output.post_process]
+command = "ollama run llama3.2:1b 'Fix grammar and remove filler words like um, uh, you know:'"
+timeout_ms = 30000
+```
+
+**Code formatting:**
+
+```toml
+[output.post_process]
+command = "ollama run llama3.2:1b 'Format as valid code. Add proper indentation and syntax:'"
+timeout_ms = 30000
+```
+
+**Technical writing:**
+
+```toml
+[output.post_process]
+command = "ollama run llama3.2:1b 'Convert to technical documentation style. Use active voice and precise terminology:'"
+timeout_ms = 30000
+```
+
+### LM Studio Example
+
+LM Studio provides an OpenAI-compatible API:
+
+```bash
+#!/bin/bash
+# ~/.local/bin/lm-studio-cleanup
+
+TEXT="$(cat)"
+
+curl -s http://localhost:1234/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"model\": \"llama-3.2-1b-instruct\",
+    \"messages\": [
+      {\"role\": \"system\", \"content\": \"Clean up dictation. Fix grammar, remove filler words.\"},
+      {\"role\": \"user\", \"content\": \"$TEXT\"}
+    ]
+  }" | jq -r '.choices[0].message.content'
+```
+
+Configuration:
+
+```toml
+[output.post_process]
+command = "~/.local/bin/lm-studio-cleanup"
+timeout_ms = 30000
+```
+
+### llama.cpp Example
+
+Using llama.cpp's server:
+
+```bash
+#!/bin/bash
+# ~/.local/bin/llama-cleanup
+
+TEXT="$(cat)"
+
+curl -s http://localhost:8080/completion \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"prompt\": \"Clean up this dictation. Fix grammar and remove filler words:\\n\\n$TEXT\\n\\nCleaned version:\",
+    \"n_predict\": 512
+  }" | jq -r '.content'
+```
+
+Configuration:
+
+```toml
+[output.post_process]
+command = "~/.local/bin/llama-cleanup"
+timeout_ms = 30000
+```
+
+### Custom Script Example
+
+Simple text processing without LLMs:
+
+```bash
+#!/bin/bash
+# ~/.local/bin/cleanup-dictation
+
+# Read from stdin
+TEXT="$(cat)"
+
+# Remove filler words
+TEXT="$(echo "$TEXT" | sed 's/\b(um|uh|like|you know)\b//gi')"
+
+# Capitalize first letter of sentences
+TEXT="$(echo "$TEXT" | sed 's/\. \([a-z]\)/. \U\1/g')"
+
+# Output to stdout
+echo "$TEXT"
+```
+
+Configuration:
+
+```toml
+[output.post_process]
+command = "~/.local/bin/cleanup-dictation"
+timeout_ms = 5000
+```
+
+### Timeout Handling
+
+If the command times out, Voxtype falls back to the original transcription:
+
+```toml
+[output.post_process]
+command = "ollama run llama3.2:1b 'Clean up:'"
+timeout_ms = 10000  # 10 seconds (aggressive timeout)
+```
+
+Increase timeout for slower models or complex prompts:
+
+```toml
+timeout_ms = 60000  # 60 seconds
+```
+
+### Error Handling
+
+If the command fails (non-zero exit code), Voxtype falls back to the original transcription and logs the error:
+
+```bash
+journalctl --user -u voxtype | grep "post-process failed"
+```
+
+## Pre/Post Output Hooks
+
+Run commands before and after text output (not for text processing, but for system integration).
+
+### Configuration
+
+```toml
+[output]
+pre_output_command = "hyprctl dispatch submap voxtype_suppress"
+post_output_command = "hyprctl dispatch submap reset"
+```
+
+### Common Use Cases
+
+**Hyprland submap (block modifier keys during typing):**
+
+```toml
+[output]
+pre_output_command = "hyprctl dispatch submap voxtype_suppress"
+post_output_command = "hyprctl dispatch submap reset"
+```
+
+See the [Compositor Integration guide](/guides/compositor-integration) for details.
+
+**Notification:**
+
+```toml
+[output]
+pre_output_command = "notify-send 'Typing transcription...'"
+post_output_command = "notify-send 'Done'"
+```
+
+**Focus window:**
+
+```bash
+#!/bin/bash
+# Focus specific window before typing
+hyprctl dispatch focuswindow "title:VS Code"
+```
+
+```toml
+[output]
+pre_output_command = "~/.local/bin/focus-vscode"
+```
+
+**Logging:**
+
+```bash
+#!/bin/bash
+# Log transcription timestamp
+date >> /tmp/voxtype-log.txt
+```
+
+```toml
+[output]
+post_output_command = "~/.local/bin/log-timestamp"
+```
+
+## Profiles
+
+Use different processing settings for different contexts.
+
+### Configuration
+
+```toml
+[profiles.slack]
+post_process_command = "ollama run llama3.2:1b 'Format for Slack. Use casual tone, add emojis where appropriate:'"
+
+[profiles.code]
+post_process_command = "ollama run llama3.2:1b 'Format as a code comment. Be concise:'"
+output_mode = "clipboard"
+
+[profiles.email]
+post_process_command = "ollama run llama3.2:1b 'Format as professional email. Add greeting and closing:'"
+```
+
+### Usage
+
+```bash
+voxtype record start --profile slack
+voxtype record stop
+
+voxtype record start --profile code
+voxtype record stop
+```
+
+With compositor keybindings:
+
+```hyprlang
+# Hyprland example
+bind = SUPER, V, exec, voxtype record start  # Default (no profile)
+bindr = SUPER, V, exec, voxtype record stop
+
+bind = SUPER SHIFT, V, exec, voxtype record start --profile code
+bindr = SUPER SHIFT, V, exec, voxtype record stop
+
+bind = SUPER CTRL, V, exec, voxtype record start --profile slack
+bindr = SUPER CTRL, V, exec, voxtype record stop
+```
+
+### Profile Options
+
+Profiles can override:
+
+```toml
+[profiles.name]
+post_process_command = "command"  # Override post-processing
+post_process_timeout_ms = 30000   # Override timeout
+output_mode = "clipboard"         # Override output mode
+```
+
+## Order of Processing
+
+Text goes through multiple stages:
+
+1. **Transcription** - Whisper generates text
+2. **Word replacements** - Apply `[text] replacements`
+3. **Spoken punctuation** - Convert spoken words to symbols (if enabled)
+4. **Post-processing command** - Pipe through external command (if configured)
+5. **Pre-output hook** - Run `pre_output_command`
+6. **Output** - Type, clipboard, paste, or file
+7. **Post-output hook** - Run `post_output_command`
+
+## Complete Examples
+
+### Developer Workflow
+
+```toml
+[text]
+spoken_punctuation = true
+replacements = {
+  "const" = "const",
+  "let" = "let",
+  "function" = "function",
+  "type script" = "TypeScript"
+}
+
+[output.post_process]
+command = "ollama run llama3.2:1b 'Format as valid code with proper syntax:'"
+timeout_ms = 30000
+```
+
+### Professional Writing
+
+```toml
+[text]
+replacements = {
+  "vox type" = "Voxtype",
+  "chat gpt" = "ChatGPT"
+}
+
+[output.post_process]
+command = "ollama run llama3.2:1b 'Fix grammar, remove filler words, use professional tone:'"
+timeout_ms = 30000
+```
+
+### Multilingual with Cleanup
+
+```toml
+[whisper]
+model = "large-v3"
+language = ["en", "fr"]
+
+[text]
+replacements = {
+  "vox type" = "Voxtype"
+}
+
+[output.post_process]
+command = "ollama run llama3.2:1b 'Clean up dictation. Preserve language (English or French):'"
+timeout_ms = 30000
+```
+
+### Profile-Based Workflows
+
+```toml
+[text]
+spoken_punctuation = true
+
+[profiles.casual]
+post_process_command = "ollama run llama3.2:1b 'Make casual and friendly:'"
+
+[profiles.formal]
+post_process_command = "ollama run llama3.2:1b 'Make formal and professional:'"
+
+[profiles.code]
+post_process_command = "ollama run llama3.2:1b 'Format as code:'"
+output_mode = "clipboard"
+
+[profiles.notes]
+output_mode = "file"
+file_path = "~/Documents/notes.txt"
+file_mode = "append"
+```
+
+Usage:
+
+```bash
+voxtype record start --profile casual   # Friendly chat
+voxtype record start --profile formal   # Professional email
+voxtype record start --profile code     # Code snippets to clipboard
+voxtype record start --profile notes    # Append to notes file
+```
+
+## Troubleshooting
+
+### Post-Processing Not Working
+
+**Check command manually:**
+
+```bash
+echo "This is a test period" | ollama run llama3.2:1b 'Clean up:'
+```
+
+If it fails, the command is invalid.
+
+**Check daemon logs:**
+
+```bash
+journalctl --user -u voxtype | grep post-process
+```
+
+Look for "post-process failed" or timeout messages.
+
+**Increase timeout:**
+
+```toml
+[output.post_process]
+timeout_ms = 60000  # 60 seconds
+```
+
+### Spoken Punctuation Not Working
+
+**Ensure it's enabled:**
+
+```toml
+[text]
+spoken_punctuation = true
+```
+
+**Say words exactly:**
+
+Say "period" not "dot", "open paren" not "left parenthesis".
+
+**Check order:**
+
+Word replacements happen before spoken punctuation. If you replace "period" with something else, spoken punctuation won't convert it.
+
+### Replacements Not Applied
+
+**Check case:**
+
+Replacements are case-insensitive for matching, but output uses the exact case in the replacement value:
+
+```toml
+replacements = { "vox type" = "Voxtype" }
+```
+
+"vox type", "Vox Type", "VOX TYPE" all become "Voxtype".
+
+**Check TOML syntax:**
+
+Use quotes around keys and values:
+
+```toml
+replacements = { "key" = "value" }  # Correct
+replacements = { key = value }      # May fail
+```
+
+### Profile Not Applied
+
+**Check profile name:**
+
+```bash
+voxtype record start --profile slack  # Must match [profiles.slack]
+```
+
+**Check config syntax:**
+
+```toml
+[profiles.slack]  # Correct
+post_process_command = "..."
+
+[profile.slack]   # Wrong (singular)
+post_process_command = "..."
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Output Modes" icon="keyboard" href="/guides/output-modes">
+    Choose between typing, clipboard, paste, and file output
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/guides/configuration">
+    Complete configuration reference
+  </Card>
+  <Card title="Compositor Integration" icon="window" href="/guides/compositor-integration">
+    Set up Hyprland, Sway, or River keybindings
+  </Card>
+  <Card title="Basic Usage" icon="book-open" href="/guides/basic-usage">
+    Return to basic usage guide
+  </Card>
+</CardGroup>

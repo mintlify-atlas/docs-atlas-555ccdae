@@ -1,0 +1,335 @@
+---
+title: 'voxtype transcribe'
+description: 'Transcribe an audio file to text'
+icon: 'file-audio'
+---
+
+## Overview
+
+The `transcribe` command converts an audio file to text using the configured transcription engine. It outputs the transcribed text to stdout, making it suitable for shell scripts and pipelines.
+
+Unlike the daemon mode, this command:
+- Processes a single file and exits
+- Does not type or paste output (prints to stdout)
+- Does not require hotkey detection
+- Can be used in batch processing workflows
+
+## Basic usage
+
+```bash
+voxtype transcribe <file>
+```
+
+### Example
+
+```bash
+voxtype transcribe recording.wav
+```
+
+**Output:**
+```
+Loading audio file: "recording.wav"
+Audio format: 44100 Hz, 2 channel(s), Int
+Resampling from 44100 Hz to 16000 Hz...
+Processing 32000 samples (2.00s)...
+
+This is the transcribed text from the audio file.
+```
+
+## Audio format requirements
+
+Voxtype automatically handles audio conversion, but for best results:
+
+- **Format:** WAV (`.wav`)
+- **Sample rate:** 16000 Hz (16kHz) - other rates will be resampled
+- **Channels:** Mono (1 channel) - stereo will be mixed to mono
+- **Bit depth:** 16-bit or 32-bit integer, or 32-bit float
+
+<Tip>
+  Use ffmpeg to convert audio files to the optimal format:
+  ```bash
+  ffmpeg -i input.mp3 -ar 16000 -ac 1 output.wav
+  voxtype transcribe output.wav
+  ```
+</Tip>
+
+## Engine override
+
+<ParamField path="--engine" type="string">
+  Override the transcription engine for this file. Options: `whisper`, `parakeet`, `moonshine`, `sensevoice`, `paraformer`, `dolphin`, `omnilingual`.
+
+  ```bash
+  voxtype transcribe audio.wav --engine parakeet
+  ```
+
+  Defaults to the engine configured in `config.toml`.
+</ParamField>
+
+## Configuration inheritance
+
+The `transcribe` command uses your daemon configuration from `config.toml`:
+
+- Whisper model selection (`[whisper] model`)
+- Language settings (`[whisper] language`)
+- Engine selection (`engine = "whisper"`)
+- GPU acceleration settings
+- VAD configuration (`[vad]`)
+
+You can override most settings via CLI flags:
+
+```bash
+voxtype --model large-v3-turbo \
+        --language en \
+        --threads 4 \
+        transcribe audio.wav
+```
+
+## Voice Activity Detection (VAD)
+
+If VAD is enabled in your config, it will filter silence before transcription:
+
+```bash
+voxtype --vad transcribe recording.wav
+```
+
+**Example output with VAD:**
+```
+Loading audio file: "recording.wav"
+Audio format: 16000 Hz, 1 channel(s), Int
+Processing 80000 samples (5.00s)...
+VAD: 3.24s speech (64.8% of audio)
+
+The actual transcribed speech content.
+```
+
+If no speech is detected, transcription is skipped:
+```
+VAD: 0.12s speech (2.4% of audio)
+No speech detected, skipping transcription.
+```
+
+<Info>
+  VAD is especially useful for batch processing to skip silence-only files and prevent Whisper hallucinations.
+</Info>
+
+## Shell integration examples
+
+### Save to file
+
+```bash
+voxtype transcribe recording.wav > transcript.txt
+```
+
+### Batch processing
+
+```bash
+for file in recordings/*.wav; do
+  echo "Processing $file..."
+  voxtype transcribe "$file" > "${file%.wav}.txt"
+done
+```
+
+### Filter with VAD
+
+```bash
+#!/bin/bash
+# Only transcribe files with speech
+
+for file in *.wav; do
+  if voxtype --vad transcribe "$file" 2>&1 | grep -q "No speech detected"; then
+    echo "Skipping $file (no speech)"
+  else
+    voxtype transcribe "$file" > "${file%.wav}.txt"
+  fi
+done
+```
+
+### Pipeline with post-processing
+
+```bash
+# Transcribe and format with LLM
+voxtype transcribe meeting.wav | \
+  llm -m gpt-4o-mini 'Format as meeting notes with bullet points' > notes.md
+```
+
+### Combine multiple recordings
+
+```bash
+# Concatenate transcripts from multiple files
+for file in part*.wav; do
+  echo "\n## $(basename $file .wav)"
+  voxtype transcribe "$file"
+done > full-transcript.txt
+```
+
+### Extract audio from video
+
+```bash
+# Extract audio from video and transcribe
+ffmpeg -i video.mp4 -ar 16000 -ac 1 -f wav - | \
+  voxtype transcribe /dev/stdin > video-transcript.txt
+```
+
+<Warning>
+  Reading from `/dev/stdin` requires WAV format. Use ffmpeg's `-f wav` output.
+</Warning>
+
+## Performance considerations
+
+### Model loading
+
+The first transcription loads the model into memory, which can take 1-5 seconds depending on model size. Subsequent calls in the same process reuse the loaded model.
+
+For batch processing, it's more efficient to keep the daemon running and use the API than to call `transcribe` repeatedly:
+
+```bash
+# Inefficient: Loads model for each file
+for file in *.wav; do
+  voxtype transcribe "$file"
+done
+
+# Better: Use daemon with record commands or implement batch API
+```
+
+### GPU memory
+
+GPU memory is allocated when the model loads and persists until the process exits. For long-running transcription jobs:
+
+```bash
+# Release GPU memory after each file
+for file in *.wav; do
+  voxtype --gpu-isolation transcribe "$file" > "${file%.wav}.txt"
+done
+```
+
+<Tip>
+  The `--gpu-isolation` flag runs transcription in a subprocess that exits after completion, releasing VRAM.
+</Tip>
+
+## Output format
+
+The transcribed text is printed to stdout without additional formatting. Diagnostic messages go to stderr, so you can safely redirect output:
+
+```bash
+# Only transcript goes to file
+voxtype transcribe audio.wav > transcript.txt
+
+# Both transcript and diagnostics
+voxtype transcribe audio.wav &> full-output.txt
+
+# Transcript to file, diagnostics to terminal
+voxtype transcribe audio.wav > transcript.txt 2>&1 | grep -v "Loading"
+```
+
+## Troubleshooting
+
+### Unsupported audio format
+
+```
+Error: failed to decode WAV file
+```
+
+**Solution:** Convert to WAV with ffmpeg:
+```bash
+ffmpeg -i audio.mp3 -ar 16000 -ac 1 audio.wav
+voxtype transcribe audio.wav
+```
+
+### Model not found
+
+```
+Error: Model 'large-v3-turbo' not found
+```
+
+**Solution:** Download the model:
+```bash
+voxtype setup --download --model large-v3-turbo
+```
+
+### VAD model missing
+
+```
+VAD warning: Model not found at ~/.local/share/voxtype/models/ggml-silero-vad.bin
+```
+
+**Solution:** Download VAD model:
+```bash
+voxtype setup vad
+```
+
+### Hallucinations on silence
+
+Whisper may generate nonsensical text when processing silence-only audio.
+
+**Solution:** Enable VAD to filter silence:
+```bash
+voxtype --vad transcribe audio.wav
+```
+
+## Advanced examples
+
+### Multilingual transcription
+
+```bash
+# Auto-detect language
+voxtype transcribe meeting.wav
+
+# Force specific languages
+voxtype --language "en,fr,es" transcribe meeting.wav
+
+# Translate to English
+voxtype --translate transcribe french-audio.wav
+```
+
+### Different models for different content
+
+```bash
+#!/bin/bash
+# Use appropriate model based on audio length
+
+duration=$(ffprobe -v error -show_entries format=duration \
+  -of default=noprint_wrappers=1:nokey=1 "$1")
+
+if (( $(echo "$duration < 30" | bc -l) )); then
+  # Short clips: use fast model
+  voxtype --model base.en transcribe "$1"
+else
+  # Long recordings: use accurate model
+  voxtype --model large-v3-turbo transcribe "$1"
+fi
+```
+
+### Custom processing pipeline
+
+```bash
+#!/bin/bash
+# Transcribe, clean up, and format
+
+voxtype transcribe "$1" | \
+  # Remove filler words
+  sed 's/\b(um|uh|like|you know)\b//gi' | \
+  # Capitalize sentences
+  awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}' | \
+  # Format with LLM
+  llm -m gpt-4o-mini 'Fix punctuation and format as paragraphs' > output.txt
+```
+
+### Timestamp extraction (with custom processing)
+
+While `voxtype transcribe` doesn't output timestamps, you can use Whisper's CLI for this:
+
+```bash
+# Use whisper-rs CLI for timestamped output
+whisper-cli --model ~/.local/share/voxtype/models/ggml-large-v3-turbo.bin \
+  --output-format srt audio.wav
+
+# Or use OpenAI's whisper directly
+whisper audio.wav --output_format srt
+```
+
+## See also
+
+- [voxtype daemon](/commands/daemon) - Main daemon mode with hotkey detection
+- [voxtype record](/commands/record) - Control recording from scripts
+- [Configuration guide](/guides/configuration) - Detailed config options
+- [Configuration guide](/guides/configuration) - Voice activity detection setup

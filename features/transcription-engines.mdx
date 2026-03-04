@@ -1,0 +1,382 @@
+---
+title: Transcription Engines
+description: Compare and choose the right speech-to-text engine for your needs
+---
+
+Voxtype supports 7 different transcription engines, giving you flexibility to optimize for speed, accuracy, language support, and hardware constraints.
+
+## Overview
+
+Each engine has different strengths and trade-offs:
+
+| Engine | Languages | Architecture | Best For |
+|--------|-----------|-------------|----------|
+| **Whisper** (default) | 99 languages | Encoder-decoder (whisper.cpp) | General use, multilingual |
+| **Parakeet** | English | FastConformer TDT (ONNX) | Fast English transcription |
+| **Moonshine** | English | Encoder-decoder (ONNX) | Edge devices, low memory |
+| **SenseVoice** | zh, en, ja, ko, yue | CTC encoder (ONNX) | Chinese, Japanese, Korean |
+| **Paraformer** | zh+en, zh+yue+en | Non-autoregressive (ONNX) | Chinese-English bilingual |
+| **Dolphin** | 40 languages + 22 Chinese dialects | CTC E-Branchformer (ONNX) | Eastern languages (no English) |
+| **Omnilingual** | 1600+ languages | wav2vec2 CTC (ONNX) | Low-resource and rare languages |
+
+## Whisper (Default)
+
+OpenAI's Whisper is the default engine, offering excellent accuracy and broad language support.
+
+### Why Use Whisper
+
+- **Multilingual**: Supports 99 languages with a single model
+- **High accuracy**: State-of-the-art transcription quality
+- **Well-tested**: Most mature and stable engine in Voxtype
+- **GPU acceleration**: CUDA, Vulkan, Metal, ROCm support
+- **Multiple backends**: Local, remote server, CLI subprocess
+
+### Available Models
+
+| Model | Size | English WER | Speed | Languages |
+|-------|------|-------------|-------|----------|
+| tiny.en | 39 MB | ~10% | Fastest | English only |
+| base.en | 142 MB | ~8% | Fast | English only |
+| small.en | 466 MB | ~6% | Medium | English only |
+| medium.en | 1.5 GB | ~5% | Slow | English only |
+| large-v3 | 3 GB | ~4% | Slowest | 99 languages |
+| large-v3-turbo | 1.6 GB | ~4% | Fast | 99 languages |
+
+**Recommendation**: `base.en` for CPU, `large-v3-turbo` for GPU
+
+### Configuration
+
+```toml
+engine = "whisper"  # Default, can be omitted
+
+[whisper]
+model = "base.en"
+language = "en"     # or "auto" for detection
+translate = false   # Translate to English?
+```
+
+### Multilingual Support
+
+**Use Case 1: Transcribe in spoken language** (speak French → output French)
+```toml
+[whisper]
+model = "large-v3"
+language = "auto"   # Auto-detect and transcribe in that language
+translate = false
+```
+
+**Use Case 2: Translate to English** (speak French → output English)
+```toml
+[whisper]
+model = "large-v3"
+language = "auto"   # Auto-detect the spoken language
+translate = true    # Translate output to English
+```
+
+**Use Case 3: Force a specific language** (always transcribe as Spanish)
+```toml
+[whisper]
+model = "large-v3"
+language = "es"     # Force Spanish transcription
+translate = false
+```
+
+### Performance Examples
+
+With GPU acceleration, even large models are fast:
+
+| Model | CPU (8-core) | Vulkan GPU (RX 6800) |
+|-------|--------------|---------------------|
+| base.en | ~7x realtime | ~35x realtime |
+| large-v3 | ~1x realtime | ~5x realtime |
+
+## ONNX Engines
+
+The ONNX engines use ONNX Runtime for inference, providing alternative architectures optimized for specific use cases.
+
+### Switching to ONNX
+
+ONNX engines require a separate binary compiled with ONNX features:
+
+```bash
+# Use the setup tool to switch binaries
+voxtype setup onnx --enable   # Switch to ONNX binary
+voxtype setup onnx --disable  # Switch back to Whisper
+```
+
+Or download ONNX binaries manually from the releases page:
+- `voxtype-*-onnx-avx2` - Most CPUs
+- `voxtype-*-onnx-avx512` - Modern CPUs with AVX-512
+- `voxtype-*-onnx-cuda` - NVIDIA GPU acceleration
+- `voxtype-*-onnx-rocm` - AMD GPU acceleration
+
+## Parakeet
+
+NVIDIA's FastConformer-based model for fast, accurate English transcription.
+
+### Why Use Parakeet
+
+- **Excellent CPU performance**: ~30x realtime on AVX-512 CPUs
+- **Proper punctuation**: Outputs capitalized text with punctuation
+- **Small model size**: 600MB for good accuracy
+- **No GPU required**: Optimized for CPU inference
+
+### Configuration
+
+```toml
+engine = "parakeet"
+
+[parakeet]
+model = "parakeet-tdt-0.6b-v3"
+on_demand_loading = false
+```
+
+### Downloading the Model
+
+```bash
+voxtype setup model  # Interactive download
+```
+
+Or manually:
+```bash
+mkdir -p ~/.local/share/voxtype/models/parakeet-tdt-0.6b-v3
+cd ~/.local/share/voxtype/models/parakeet-tdt-0.6b-v3
+# Download encoder-model.onnx, decoder_joint-model.onnx, vocab.txt, config.json
+# from https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx
+```
+
+### Performance
+
+Tested on Ryzen 9 9900X3D (AVX-512):
+
+| Audio Length | Transcription Time | Real-time Factor |
+|--------------|-------------------|------------------|
+| 1-2s | 0.06-0.09s | ~20x |
+| 3-4s | 0.11-0.13s | ~30x |
+| 5s | 0.15s | ~33x |
+
+### Limitations
+
+- **English only**: No multilingual support
+- **Repetition hallucination**: May repeat words more than spoken
+- **Proper nouns**: Technical terms may be substituted with phonetically similar words
+
+## Moonshine
+
+Moonshine AI's lightweight encoder-decoder transformer optimized for edge devices.
+
+### Why Use Moonshine
+
+- **Very fast on CPU**: 0.09s for 4-second audio
+- **Small models**: Base is 237MB, tiny is 100MB
+- **Multilingual options**: Japanese, Mandarin, Korean, Arabic
+- **Low memory**: Minimal resource usage
+
+### Available Models
+
+| Model | Languages | Size | License |
+|-------|-----------|------|--------|
+| tiny | English | 100 MB | MIT |
+| base | English | 237 MB | MIT |
+| tiny-ja | Japanese | 100 MB | Community |
+| tiny-zh | Mandarin | 100 MB | Community |
+| tiny-ko | Korean | 100 MB | Community |
+| tiny-ar | Arabic | 100 MB | Community |
+| base-ja | Japanese | 237 MB | Community |
+| base-zh | Mandarin | 237 MB | Community |
+
+**Note**: Non-English models require the Moonshine Community License (free for non-commercial use).
+
+### Configuration
+
+```toml
+engine = "moonshine"
+
+[moonshine]
+model = "base"      # or "tiny", "base-ja", etc.
+quantized = true    # Use quantized models when available
+```
+
+### Downloading Models
+
+```bash
+voxtype setup model  # Interactive download with license acceptance
+```
+
+### Performance
+
+| Engine | Model | Time (4s audio) |
+|--------|-------|----------------|
+| Moonshine | base | 0.09s |
+| Parakeet | TDT 0.6B | 0.3-0.5s |
+| Whisper | large-v3-turbo | 17.7s |
+
+### Limitations
+
+- **No punctuation**: Outputs lowercase without punctuation (use `spoken_punctuation`)
+- **Two sizes only**: No medium or large variants
+- **No streaming**: Batch mode only (sufficient for push-to-talk)
+
+## SenseVoice
+
+CTC-based encoder optimized for Chinese, Japanese, and Korean.
+
+### Why Use SenseVoice
+
+- **Native CJK support**: Excellent for Chinese, Japanese, Korean
+- **Fast inference**: CTC architecture is faster than encoder-decoder
+- **Cantonese support**: Includes Yue (Cantonese) in addition to Mandarin
+- **Emotion recognition**: Detects emotional tone in speech
+
+### Configuration
+
+```toml
+engine = "sensevoice"
+
+[sensevoice]
+model = "sensevoice-small"  # or path to model directory
+language = "auto"           # or "zh", "en", "ja", "ko", "yue"
+```
+
+### Supported Languages
+
+- Chinese (Mandarin): `zh`
+- English: `en`
+- Japanese: `ja`
+- Korean: `ko`
+- Cantonese: `yue`
+- Auto-detect: `auto`
+
+## Paraformer
+
+FunASR's non-autoregressive model for Chinese-English bilingual transcription.
+
+### Why Use Paraformer
+
+- **Bilingual**: Handles Chinese and English in same recording
+- **Fast**: Non-autoregressive architecture
+- **Code-switching**: Good for mixed-language conversations
+
+### Configuration
+
+```toml
+engine = "paraformer"
+
+[paraformer]
+model = "paraformer-zh"  # or "paraformer-zh-yue-en"
+```
+
+## Dolphin
+
+CTC E-Branchformer optimized for 40 languages and 22 Chinese dialects.
+
+### Why Use Dolphin
+
+- **Eastern languages**: Covers many Asian and African languages
+- **Chinese dialects**: 22 Chinese regional variants
+- **No English**: Optimized for non-English languages
+- **Dictation-optimized**: Tuned for spoken input
+
+### Configuration
+
+```toml
+engine = "dolphin"
+
+[dolphin]
+model = "dolphin-base"
+```
+
+### Supported Languages
+
+Includes: Arabic, Bengali, Burmese, Cantonese, Filipino, Gujarati, Hindi, Indonesian, Japanese, Javanese, Kannada, Khmer, Korean, Lao, Malayalam, Marathi, Mongolian, Nepali, Odia, Persian, Portuguese, Punjabi, Russian, Sinhala, Spanish, Swahili, Tamil, Telugu, Thai, Turkish, Ukrainian, Urdu, Uzbek, Vietnamese, Wu, Xiang, and 22 Chinese dialects.
+
+## Omnilingual
+
+Wav2vec2-based model for 1600+ languages, including low-resource and rare languages.
+
+### Why Use Omnilingual
+
+- **Maximum language coverage**: 1600+ languages
+- **Low-resource languages**: Supports languages not in Whisper
+- **Regional variants**: Many dialects and regional variants
+- **Accessibility**: Makes voice-to-text accessible to more speakers
+
+### Configuration
+
+```toml
+engine = "omnilingual"
+
+[omnilingual]
+model = "omnilingual-base"
+```
+
+### Trade-offs
+
+- **Lower accuracy**: Broader coverage means less specialization
+- **No punctuation**: CTC-based model without punctuation prediction
+- **Best for niche languages**: Use Whisper or Parakeet if your language is well-supported
+
+## Choosing the Right Engine
+
+### For English Dictation
+
+1. **Best accuracy**: Whisper `large-v3-turbo` with GPU
+2. **Best CPU speed**: Parakeet `parakeet-tdt-0.6b-v3`
+3. **Lowest memory**: Moonshine `tiny`
+4. **Balanced**: Whisper `base.en`
+
+### For Multilingual Use
+
+1. **Western languages**: Whisper `large-v3`
+2. **Chinese/Japanese/Korean**: SenseVoice
+3. **Mixed Chinese-English**: Paraformer
+4. **Eastern languages**: Dolphin
+5. **Rare/low-resource**: Omnilingual
+
+### For Hardware Constraints
+
+1. **Limited memory**: Moonshine `tiny` (100MB)
+2. **No GPU**: Parakeet or Moonshine
+3. **Fast GPU**: Whisper `large-v3-turbo` with CUDA/Vulkan
+4. **Edge devices**: Moonshine `base`
+
+## Switching Engines
+
+You can switch engines in your config:
+
+```toml
+# Change this line:
+engine = "parakeet"  # or "moonshine", "sensevoice", etc.
+
+# Add corresponding engine config:
+[parakeet]
+model = "parakeet-tdt-0.6b-v3"
+```
+
+Or override per transcription:
+
+```bash
+voxtype --engine moonshine transcribe audio.wav
+```
+
+Restart the daemon after changing engines:
+
+```bash
+systemctl --user restart voxtype
+```
+
+## Model Downloads
+
+Use the interactive model selection tool:
+
+```bash
+voxtype setup model
+```
+
+This shows all available engines and models, handles downloads, and updates your config automatically.
+
+## Further Reading
+
+- [GPU Acceleration](/features/gpu-acceleration) - Speed up transcription with GPU
+- [Model Selection Guide](https://github.com/peteonrails/voxtype/blob/main/docs/MODEL_SELECTION_GUIDE.md) - Detailed model comparison
+- [Configuration guide](/guides/configuration) - Full engine configuration options

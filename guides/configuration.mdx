@@ -1,0 +1,767 @@
+---
+title: Configuration
+description: Complete reference for configuring Voxtype settings, hotkeys, models, and output modes
+---
+
+# Configuration
+
+Voxtype uses a TOML configuration file to customize behavior. This guide covers all major configuration options.
+
+## Config File Location
+
+Voxtype looks for configuration in this order:
+
+1. Path specified via `-c` / `--config` flag
+2. `~/.config/voxtype/config.toml` (default)
+3. `/etc/voxtype/config.toml` (system-wide)
+4. Built-in defaults
+
+### Creating a Config File
+
+```bash
+# Create config directory
+mkdir -p ~/.config/voxtype
+
+# View current config with defaults
+voxtype config > ~/.config/voxtype/config.toml
+```
+
+Or copy the example:
+
+```bash
+cp config/default.toml ~/.config/voxtype/config.toml
+```
+
+## Configuration Structure
+
+The config file is organized into sections:
+
+- **[hotkey]** - Key bindings and activation mode
+- **[audio]** - Microphone and recording settings
+- **[whisper]** - Transcription model and language
+- **[output]** - Text output mode and drivers
+- **[text]** - Word replacements and spoken punctuation
+- **[meeting]** - Meeting transcription settings
+- **[vad]** - Voice Activity Detection
+- **[status]** - Status bar integration icons
+- **[profiles]** - Named configurations for different contexts
+
+## State File
+
+Controls where the daemon writes its current state for external integrations (Waybar, scripts).
+
+```toml
+# Default: auto-detect location ($XDG_RUNTIME_DIR/voxtype/state)
+state_file = "auto"
+
+# Or specify a path
+state_file = "/tmp/voxtype-state"
+
+# Or disable
+state_file = "disabled"
+```
+
+The state file contains: `"idle"`, `"recording"`, `"transcribing"`, or `"outputting"`.
+
+Required for `voxtype record toggle` and `voxtype status` commands.
+
+## [hotkey] - Key Bindings
+
+Controls the built-in evdev hotkey detection.
+
+### Basic Configuration
+
+```toml
+[hotkey]
+# Enable built-in hotkey (false if using compositor keybindings)
+enabled = true
+
+# Main hotkey (evdev key name)
+key = "SCROLLLOCK"
+
+# Optional modifier keys
+modifiers = []  # e.g., ["LEFTCTRL", "LEFTALT"]
+
+# Activation mode: "push_to_talk" or "toggle"
+mode = "push_to_talk"
+```
+
+### Available Keys
+
+Common hotkeys:
+- `SCROLLLOCK` - Scroll Lock key (default)
+- `PAUSE` - Pause/Break key
+- `RIGHTALT` - Right Alt key
+- `F13` through `F24` - Extended function keys
+- `MEDIA` - Media key
+- `RECORD` - Record key
+- `INSERT`, `HOME`, `END`, `PAGEUP`, `PAGEDOWN`, `DELETE`
+
+<Note>
+Use `evtest` to find key names:
+```bash
+sudo evtest
+# Select keyboard, press key, note KEY_XXXXX name (without KEY_ prefix)
+```
+</Note>
+
+### Numeric Keycodes
+
+If your key isn't in the built-in list, specify by keycode:
+
+```toml
+[hotkey]
+key = "WEV_234"      # XKB keycode from wev/xev
+key = "EVTEST_226"   # Kernel keycode from evtest
+key = "WEV_0xEA"     # Hex also works
+```
+
+Prefixes:
+- `WEV_`, `X11_`, `XEV_` - XKB keycode (offset by 8 from kernel)
+- `EVTEST_` - Kernel keycode
+
+### Cancel Key
+
+Abort recording or transcription without outputting text:
+
+```toml
+[hotkey]
+cancel_key = "ESC"  # Press Escape to cancel
+```
+
+### Modifier Key for Secondary Model
+
+Use a different model when holding a modifier:
+
+```toml
+[hotkey]
+model_modifier = "LEFTSHIFT"  # Shift + hotkey uses secondary model
+
+[whisper]
+model = "base.en"
+secondary_model = "large-v3-turbo"
+```
+
+## [audio] - Audio Settings
+
+```toml
+[audio]
+# Audio input device ("default" or device name from pactl)
+device = "default"
+
+# Sample rate in Hz (whisper expects 16000)
+sample_rate = 16000
+
+# Maximum recording duration in seconds (safety limit)
+max_duration_secs = 60
+```
+
+### Finding Device Names
+
+```bash
+pactl list sources short
+```
+
+Example:
+
+```toml
+[audio]
+device = "alsa_input.usb-Blue_Microphones_Yeti-00.analog-stereo"
+```
+
+### Audio Feedback
+
+Sound cues when recording starts/stops:
+
+```toml
+[audio.feedback]
+enabled = true
+theme = "default"  # "default", "subtle", "mechanical", or path
+volume = 0.7       # 0.0 to 1.0
+```
+
+**Built-in themes:**
+- `default` - Clear two-tone beeps
+- `subtle` - Quiet clicks
+- `mechanical` - Typewriter sounds
+
+**Custom theme:**
+
+```toml
+[audio.feedback]
+enabled = true
+theme = "/home/user/.config/voxtype/sounds"
+volume = 0.8
+```
+
+Custom theme directory must contain: `start.wav`, `stop.wav`, `error.wav`
+
+## [whisper] - Transcription
+
+### Basic Configuration
+
+```toml
+[whisper]
+# Execution mode: "local", "remote", or "cli"
+mode = "local"
+
+# Model to use
+model = "base.en"
+
+# Language: "en", "auto", or ["en", "fr"] for constrained detection
+language = "en"
+
+# Translate non-English speech to English
+translate = false
+
+# Number of CPU threads (omit for auto-detect)
+# threads = 4
+```
+
+### Available Models
+
+| Model | Size | Speed | Accuracy | Languages |
+|-------|------|-------|----------|----------|
+| `tiny.en` | 39 MB | Fastest | Good | English only |
+| `base.en` | 142 MB | Fast | Better | English only |
+| `small.en` | 466 MB | Medium | Great | English only |
+| `medium.en` | 1.5 GB | Slow | Excellent | English only |
+| `large-v3` | 3.1 GB | Slowest | Best | 99 languages |
+| `large-v3-turbo` | 1.6 GB | Fast | Excellent | 99 languages |
+
+<Tip>
+`.en` models are English-only but faster and more accurate for English. `large-v3-turbo` is recommended for GPU users.
+</Tip>
+
+### Language Configuration
+
+Three modes:
+
+**1. Single language (fastest, most accurate):**
+
+```toml
+[whisper]
+language = "en"  # or "fr", "es", "de", "ja", "zh", etc.
+```
+
+**2. Auto-detect from all languages:**
+
+```toml
+[whisper]
+language = "auto"
+model = "large-v3"  # Multilingual model required
+```
+
+**3. Constrained auto-detect (recommended for multilingual users):**
+
+```toml
+[whisper]
+language = ["en", "fr"]  # Auto-detect between English and French
+model = "large-v3"
+```
+
+Constrained detection is more accurate for short sentences where Whisper might misdetect the language.
+
+### Multi-Model Configuration
+
+Configure multiple models:
+
+```toml
+[whisper]
+model = "base.en"  # Primary model
+
+# Secondary model (used with hotkey.model_modifier or CLI --model)
+secondary_model = "large-v3-turbo"
+
+# Additional available models
+available_models = ["medium.en"]
+
+# Model caching (only applies when gpu_isolation = false)
+max_loaded_models = 2  # LRU eviction
+cold_model_timeout_secs = 300  # 5 minutes before unloading idle models
+```
+
+Use via CLI:
+
+```bash
+voxtype record start --model large-v3-turbo
+```
+
+### On-Demand Loading
+
+Load model only when recording starts:
+
+```toml
+[whisper]
+on_demand_loading = true
+```
+
+Trade-off:
+- **Pros:** Saves memory/VRAM when idle
+- **Cons:** Slight delay at start of first recording
+
+### GPU Memory Isolation
+
+Run transcription in a subprocess that exits after completion:
+
+```toml
+[whisper]
+gpu_isolation = true
+```
+
+**When to use:**
+- Laptops with hybrid graphics (allows dGPU to sleep)
+- Limited VRAM (releases GPU memory between recordings)
+
+**Trade-off:** Slightly slower per recording (model load/unload overhead)
+
+### Context Window Optimization
+
+Use smaller context window for short recordings:
+
+```toml
+[whisper]
+context_window_optimization = false  # Disabled by default
+```
+
+<Warning>
+Some models (especially `large-v3` and `large-v3-turbo`) may experience repetition loops with this enabled. Only enable if you experience faster transcription without issues.
+</Warning>
+
+### Initial Prompt
+
+Provide context to improve accuracy:
+
+```toml
+[whisper]
+initial_prompt = "Technical discussion about Rust, TypeScript, and Kubernetes."
+```
+
+Use for:
+- Domain-specific terminology
+- Proper nouns (names, products)
+- Formatting conventions
+
+### Remote Whisper Server
+
+Send audio to a remote server:
+
+```toml
+[whisper]
+mode = "remote"
+remote_endpoint = "http://192.168.1.100:8080"  # whisper.cpp server
+remote_model = "whisper-1"  # Model name to request
+remote_timeout_secs = 30
+
+# Optional: API key (or use VOXTYPE_WHISPER_API_KEY env var)
+# remote_api_key = "sk-..."
+```
+
+**OpenAI API:**
+
+```toml
+[whisper]
+mode = "remote"
+remote_endpoint = "https://api.openai.com"
+remote_model = "whisper-1"
+remote_api_key = "sk-proj-..."
+```
+
+### CLI Backend (whisper-cli)
+
+Use whisper-cli subprocess instead of FFI:
+
+```toml
+[whisper]
+mode = "cli"
+whisper_cli_path = "/usr/local/bin/whisper-cli"  # Optional
+```
+
+Fallback for systems where whisper-rs crashes (e.g., glibc 2.42+).
+
+## [output] - Text Output
+
+### Output Mode
+
+```toml
+[output]
+# Primary output mode: "type", "clipboard", "paste", or "file"
+mode = "type"
+
+# Fall back to clipboard if typing fails
+fallback_to_clipboard = true
+```
+
+**Modes:**
+- **type** - Simulates keyboard input at cursor (wtype → dotool → ydotool → clipboard)
+- **clipboard** - Copies text to clipboard (wl-clipboard)
+- **paste** - Copies to clipboard then simulates Ctrl+V
+- **file** - Writes to a file
+
+See the [Output Modes guide](/guides/output-modes) for details.
+
+### Driver Order
+
+Customize the fallback chain for type mode:
+
+```toml
+[output]
+driver_order = ["wtype", "dotool", "ydotool", "clipboard"]
+```
+
+Available drivers:
+- `wtype` - Wayland virtual keyboard (best Unicode/CJK support, no daemon)
+- `dotool` - uinput with keyboard layout support (no daemon)
+- `ydotool` - uinput fallback (requires ydotoold daemon)
+- `clipboard` - wl-clipboard (universal fallback)
+
+**Examples:**
+
+```toml
+# Prefer ydotool over dotool
+driver_order = ["wtype", "ydotool", "dotool", "clipboard"]
+
+# Use only ydotool (no fallback)
+driver_order = ["ydotool"]
+```
+
+### Typing Delays
+
+```toml
+[output]
+# Delay before typing starts (ms)
+pre_type_delay_ms = 0
+
+# Delay between each character (ms)
+type_delay_ms = 0
+```
+
+Increase if characters are dropped or typed out of order.
+
+### Auto-Submit
+
+Automatically press Enter after output:
+
+```toml
+[output]
+auto_submit = true
+```
+
+Useful for chat apps, terminals, or forms.
+
+### Shift+Enter Newlines
+
+Convert newlines to Shift+Enter instead of Enter:
+
+```toml
+[output]
+shift_enter_newlines = true
+```
+
+Useful for apps where Enter submits (Slack, Discord, Cursor IDE).
+
+### Paste Mode Settings
+
+```toml
+[output]
+mode = "paste"
+
+# Keystroke for paste (default: "ctrl+v")
+paste_keys = "ctrl+v"  # or "shift+insert", "ctrl+shift+v"
+
+# Restore clipboard after paste
+restore_clipboard = false
+restore_clipboard_delay_ms = 200
+```
+
+### File Output
+
+```toml
+[output]
+mode = "file"
+file_path = "/tmp/voxtype-output.txt"
+file_mode = "overwrite"  # or "append"
+```
+
+### Pre/Post Output Hooks
+
+Run commands before/after typing:
+
+```toml
+[output]
+# Run before typing starts
+pre_output_command = "hyprctl dispatch submap voxtype_suppress"
+
+# Run after typing completes
+post_output_command = "hyprctl dispatch submap reset"
+```
+
+Used for [compositor integration](/guides/compositor-integration) to block modifier keys during typing.
+
+### dotool Keyboard Layout
+
+For non-US keyboard layouts:
+
+```toml
+[output]
+dotool_xkb_layout = "de"  # German
+dotool_xkb_variant = "nodeadkeys"  # Optional
+```
+
+See the [Output Modes guide](/guides/output-modes) for more details.
+
+### Notifications
+
+```toml
+[output.notification]
+on_recording_start = false  # Notify when recording starts
+on_recording_stop = false   # Notify when transcription begins
+on_transcription = true     # Show transcribed text
+```
+
+### Post-Processing Command
+
+Pipe transcriptions through an external command:
+
+```toml
+[output.post_process]
+command = "ollama run llama3.2:1b 'Clean up this dictation. Fix grammar, remove filler words:'"
+timeout_ms = 30000  # 30 seconds
+```
+
+See the [Text Processing guide](/guides/text-processing) for examples.
+
+## [text] - Text Processing
+
+### Word Replacements
+
+Fix commonly misheard words:
+
+```toml
+[text]
+replacements = { "vox type" = "voxtype", "oh marky" = "Omarchy" }
+```
+
+Case-insensitive matching.
+
+### Spoken Punctuation
+
+Convert spoken words to symbols:
+
+```toml
+[text]
+spoken_punctuation = true
+```
+
+Examples:
+- "period" → `.`
+- "comma" → `,`
+- "open paren" → `(`
+- "close paren" → `)`
+- "new line" → `\n`
+
+See the [Text Processing guide](/guides/text-processing) for the full list.
+
+## [meeting] - Meeting Transcription
+
+Continuous transcription for meetings:
+
+```toml
+[meeting]
+enabled = false
+chunk_duration_secs = 30
+storage_path = "auto"  # ~/.local/share/voxtype/meetings/
+retain_audio = false
+max_duration_mins = 180  # 3 hours
+
+[meeting.audio]
+mic_device = "default"
+loopback_device = "auto"  # Capture remote participants
+echo_cancel = "auto"  # Remove speaker bleed-through
+
+[meeting.diarization]
+enabled = true
+backend = "simple"  # "simple", "ml", or "remote"
+max_speakers = 10
+
+[meeting.summary]
+backend = "disabled"  # "local", "remote", or "disabled"
+ollama_url = "http://localhost:11434"
+ollama_model = "llama3.2"
+timeout_secs = 120
+```
+
+See the Meeting Mode documentation for details.
+
+## [vad] - Voice Activity Detection
+
+Filter silence-only recordings:
+
+```toml
+[vad]
+enabled = false  # Enable VAD
+backend = "auto"  # "auto", "energy", or "whisper"
+threshold = 0.5   # 0.0 (sensitive) to 1.0 (aggressive)
+min_speech_duration_ms = 100
+```
+
+**Backends:**
+- `auto` - Whisper VAD for Whisper engine, Energy VAD for ONNX engines
+- `energy` - RMS-based detection (no model needed)
+- `whisper` - Silero VAD via whisper-rs (requires model download)
+
+## [status] - Status Display Icons
+
+Customize icons for Waybar/tray integrations:
+
+```toml
+[status]
+icon_theme = "emoji"  # or "nerd-font", "material", "minimal", "text", etc.
+
+# Per-state overrides (optional)
+[status.icons]
+idle = "🎙️"
+recording = "🎤"
+transcribing = "⏳"
+stopped = ""
+```
+
+**Built-in themes:**
+
+| Theme | Requires Font | Icons |
+|-------|--------------|-------|
+| `emoji` | No | 🎙️ 🎤 ⏳ |
+| `minimal` | No | ○ ● ◐ × |
+| `dots` | No | ◯ ⬤ ◔ ◌ |
+| `arrows` | No | ▶ ● ↻ ■ |
+| `text` | No | [MIC] [REC] [...] [OFF] |
+| `nerd-font` | Nerd Font |     |
+| `material` | MDI | c a e d |
+| `phosphor` | Phosphor |     |
+| `codicons` | Codicons |     |
+| `omarchy` | Nerd Font |  c f  |
+
+## [profiles] - Named Profiles
+
+Context-specific configurations:
+
+```toml
+[profiles.slack]
+post_process_command = "ollama run llama3.2:1b 'Format for Slack...'"
+
+[profiles.code]
+post_process_command = "ollama run llama3.2:1b 'Format as code comment...'"
+output_mode = "clipboard"
+```
+
+Use with:
+
+```bash
+voxtype record start --profile slack
+```
+
+## Environment Variable Overrides
+
+All config options can be overridden via `VOXTYPE_*` environment variables:
+
+```bash
+VOXTYPE_MODEL=large-v3-turbo voxtype
+VOXTYPE_AUTO_SUBMIT=true voxtype
+VOXTYPE_WHISPER_API_KEY=sk-... voxtype
+```
+
+## CLI Flag Overrides
+
+CLI flags override both config file and environment variables:
+
+```bash
+voxtype --model large-v3-turbo --auto-submit --clipboard
+```
+
+## Configuration Priority
+
+Settings are applied in layers (highest priority wins):
+
+1. **CLI flags** (highest)
+2. **Environment variables** (`VOXTYPE_*`)
+3. **Config file** (`~/.config/voxtype/config.toml`)
+4. **Built-in defaults** (lowest)
+
+## Common Configuration Examples
+
+### Fast English Transcription
+
+```toml
+[whisper]
+model = "base.en"
+language = "en"
+context_window_optimization = false
+
+[output]
+mode = "type"
+auto_submit = true
+```
+
+### Multilingual with GPU
+
+```toml
+[whisper]
+model = "large-v3-turbo"
+language = ["en", "fr", "de"]
+threads = 8
+gpu_isolation = false
+
+[output]
+mode = "type"
+driver_order = ["wtype", "dotool", "clipboard"]
+```
+
+### Non-US Keyboard Layout
+
+```toml
+[output]
+mode = "type"
+driver_order = ["dotool", "wtype", "clipboard"]
+dotool_xkb_layout = "de"
+dotool_xkb_variant = "nodeadkeys"
+```
+
+### Compositor Keybindings with LLM Cleanup
+
+```toml
+[hotkey]
+enabled = false
+
+[whisper]
+model = "base.en"
+
+[output]
+mode = "type"
+pre_output_command = "hyprctl dispatch submap voxtype_suppress"
+post_output_command = "hyprctl dispatch submap reset"
+
+[output.post_process]
+command = "ollama run llama3.2:1b 'Clean up this dictation:'"
+timeout_ms = 30000
+
+[text]
+spoken_punctuation = true
+replacements = { "vox type" = "voxtype" }
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Output Modes" icon="keyboard" href="/guides/output-modes">
+    Deep dive into type, clipboard, paste, and file output
+  </Card>
+  <Card title="Text Processing" icon="wand-magic-sparkles" href="/guides/text-processing">
+    Post-process with LLMs and word replacements
+  </Card>
+  <Card title="Compositor Integration" icon="window" href="/guides/compositor-integration">
+    Set up Hyprland, Sway, or River keybindings
+  </Card>
+  <Card title="Basic Usage" icon="book-open" href="/guides/basic-usage">
+    Return to basic usage guide
+  </Card>
+</CardGroup>

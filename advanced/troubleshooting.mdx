@@ -1,0 +1,441 @@
+---
+title: Troubleshooting
+description: Solutions to common issues when using Voxtype
+---
+
+Solutions to common issues when using Voxtype.
+
+## Permission Issues
+
+### "Cannot open input device" or "Permission denied"
+
+**Symptom:** Error when trying to use the built-in evdev hotkey.
+
+**Cause:** User is not in the `input` group, required for evdev access.
+
+**Solution:**
+```bash
+# Add user to input group
+sudo usermod -aG input $USER
+
+# IMPORTANT: Log out and back in for changes to take effect
+# Verify membership
+groups | grep input
+```
+
+<Note>
+This only affects the built-in evdev hotkey. If using compositor keybindings, you don't need the input group.
+</Note>
+
+### Compositor keybindings (recommended alternative)
+
+Instead of using the built-in hotkey, configure your compositor to call `voxtype record start/stop`:
+
+```bash
+voxtype setup compositor hyprland  # or sway, river
+```
+
+Then disable the built-in hotkey:
+```toml
+[hotkey]
+enabled = false
+```
+
+See the [Compositor Integration guide](/guides/compositor-integration) for details.
+
+## Text Output Problems
+
+### Text not appearing / typing not working
+
+**Symptom:** Recording completes but no text appears at cursor.
+
+**Cause:** Missing typing backend (wtype, dotool, or ydotool).
+
+**Solution:** Install a typing backend:
+
+<Tabs>
+  <Tab title="Wayland (Hyprland/Sway)">
+    ```bash
+    # Install wtype (best Unicode/CJK support)
+    # Fedora:
+    sudo dnf install wtype
+    # Arch:
+    sudo pacman -S wtype
+    # Ubuntu:
+    sudo apt install wtype
+    ```
+  </Tab>
+  <Tab title="KDE/GNOME Wayland">
+    wtype doesn't work on KDE Plasma or GNOME. Use dotool instead:
+    
+    ```bash
+    # Arch (AUR):
+    yay -S dotool
+    # From source: https://sr.ht/~geb/dotool/
+    
+    # Add user to input group
+    sudo usermod -aG input $USER
+    # Log out and back in
+    ```
+    
+    For non-US keyboard layouts, configure your layout:
+    ```toml
+    [output]
+    dotool_xkb_layout = "de"  # German, French ("fr"), etc.
+    ```
+  </Tab>
+  <Tab title="X11">
+    ```bash
+    # Install dotool (recommended for keyboard layout support)
+    # See instructions above
+    
+    # Or install ydotool as fallback
+    # Ubuntu/Debian:
+    sudo apt install ydotool
+    systemctl --user enable --now ydotool
+    
+    # Arch:
+    sudo pacman -S ydotool
+    systemctl --user enable --now ydotool
+    ```
+  </Tab>
+</Tabs>
+
+### Wrong characters on non-US keyboard layouts (y/z swapped)
+
+**Symptom:** On German/French keyboards, characters are wrong (e.g., "Python" becomes "Pzthon").
+
+**Cause:** ydotool sends raw US keycodes and doesn't support keyboard layouts.
+
+**Solution:** Install dotool and configure your keyboard layout:
+
+```bash
+# 1. Install dotool
+yay -S dotool  # Arch (AUR)
+# Or build from source: https://sr.ht/~geb/dotool/
+
+# 2. Add user to input group
+sudo usermod -aG input $USER
+# Log out and back in
+
+# 3. Configure your keyboard layout
+```
+
+Add to `~/.config/voxtype/config.toml`:
+```toml
+[output]
+dotool_xkb_layout = "de"  # German QWERTZ
+# dotool_xkb_layout = "fr"  # French AZERTY
+# dotool_xkb_layout = "es"  # Spanish
+```
+
+**Alternative:** Use paste mode (works regardless of layout):
+```toml
+[output]
+mode = "paste"  # Copies to clipboard, then simulates Ctrl+V
+```
+
+### Characters dropped or garbled
+
+**Symptom:** Some characters are missing or wrong.
+
+**Cause:** Typing too fast for the application.
+
+**Solution:** Increase typing delay:
+```toml
+[output]
+type_delay_ms = 10  # Try 10-50ms
+```
+
+## Audio Problems
+
+### "No audio captured" or empty transcriptions
+
+**Possible causes and solutions:**
+
+#### 1. Wrong audio device selected
+
+```bash
+# List available audio sources
+pactl list sources short
+
+# Test recording with system default
+arecord -d 3 -f S16_LE -r 16000 test.wav
+aplay test.wav
+```
+
+If test recording works, check your Voxtype config:
+```toml
+[audio]
+device = "default"  # Or specific device name from pactl
+```
+
+#### 2. Microphone muted or volume too low
+
+```bash
+# Check PulseAudio/PipeWire volume
+pavucontrol
+# Or
+pactl list sources | grep -A 10 "Default"
+```
+
+#### 3. PipeWire/PulseAudio not running
+
+```bash
+# Check audio server status
+pactl info
+
+# Restart if needed
+systemctl --user restart pipewire pipewire-pulse
+# Or for PulseAudio:
+systemctl --user restart pulseaudio
+```
+
+### Recording stops unexpectedly
+
+**Cause:** `max_duration_secs` limit reached.
+
+**Solution:** Increase the limit:
+```toml
+[audio]
+max_duration_secs = 120  # 2 minutes
+```
+
+## Transcription Issues
+
+### "Model not found"
+
+**Cause:** Whisper model not downloaded.
+
+**Solution:**
+```bash
+# Download the configured model
+voxtype setup --download
+
+# Or choose a model interactively
+voxtype setup model
+```
+
+### Poor transcription accuracy
+
+**Possible causes:**
+
+#### 1. Using wrong model
+- For English: Use `.en` models (e.g., `base.en`)
+- For accuracy: Use larger models (`small.en`, `medium.en`)
+- For other languages: Use multilingual models (`large-v3`)
+
+```toml
+[whisper]
+model = "base.en"  # Fast and accurate for English
+# model = "large-v3"  # For other languages
+```
+
+#### 2. Audio quality issues
+- Use a quality microphone
+- Reduce background noise
+- Maintain consistent distance from mic
+- Speak clearly and at normal pace
+
+#### 3. Context window optimization causing phrase repetition
+
+Context window optimization is disabled by default. If you enabled it and experience phrase repetition (e.g., "word word word"), disable it:
+
+```toml
+[whisper]
+context_window_optimization = false  # Default
+```
+
+### Voxtype crashes during transcription
+
+**Symptom:** Crashes on some systems (particularly with glibc 2.42+).
+
+**Cause:** whisper-rs FFI bindings crash due to C++ exceptions crossing the FFI boundary.
+
+**Solution:** Use the CLI backend which runs whisper-cli as a subprocess:
+
+```toml
+[whisper]
+backend = "cli"
+```
+
+This requires `whisper-cli` to be installed. Build from [whisper.cpp](https://github.com/ggerganov/whisper.cpp):
+
+```bash
+git clone https://github.com/ggerganov/whisper.cpp
+cd whisper.cpp
+cmake -B build
+cmake --build build --config Release
+sudo cp build/bin/whisper-cli /usr/local/bin/
+```
+
+## Modifier Key Interference
+
+### Typed text triggers window manager shortcuts (Hyprland/Sway/River)
+
+**Symptom:** When using compositor keybindings with modifiers (e.g., `SUPER+CTRL+X`), releasing keys slowly causes typed output to trigger shortcuts instead of inserting text.
+
+**Cause:** The compositor tracks physical keyboard state. Even though voxtype types text, if you're still holding a modifier key, the compositor combines them.
+
+**Solution:** Use the compositor setup command to automatically install a fix:
+
+```bash
+# For Hyprland:
+voxtype setup compositor hyprland
+hyprctl reload
+systemctl --user restart voxtype
+
+# For Sway:
+voxtype setup compositor sway
+swaymsg reload
+systemctl --user restart voxtype
+
+# For River:
+voxtype setup compositor river
+# Restart River or source the new config
+systemctl --user restart voxtype
+```
+
+This installs pre/post output hooks that block modifier keys during text output using compositor submaps/modes.
+
+If voxtype crashes while typing, press **F12** to escape the submap and restore normal modifier behavior.
+
+**Alternative workaround:** Add a delay before typing:
+```toml
+[output.post_process]
+command = "sleep 0.3 && cat"
+timeout_ms = 5000
+```
+
+### Compositors without mode/submap support
+
+The automatic fix only works on Hyprland, Sway, and River. For other compositors:
+
+1. **Use a dedicated key without modifiers** (ScrollLock, Pause, F13-F24)
+2. **Use the post-processor delay** (works on any compositor)
+3. **Use voxtype's built-in evdev hotkey** instead of compositor keybindings
+
+## ydotool Issues
+
+### "ydotool daemon not running"
+
+**Cause:** ydotool systemd service not started.
+
+**Solution:** The setup varies by distribution:
+
+<Tabs>
+  <Tab title="Arch Linux">
+    ```bash
+    # Enable and start ydotool as a user service
+    systemctl --user enable --now ydotool
+    
+    # Verify it's running
+    systemctl --user status ydotool
+    ```
+  </Tab>
+  <Tab title="Fedora">
+    Fedora provides a system-level service that requires additional configuration:
+    
+    ```bash
+    # 1. Enable and start the system service
+    sudo systemctl enable --now ydotool
+    
+    # 2. Edit the service to allow your user to access the socket
+    sudo systemctl edit ydotool
+    ```
+    
+    Add this content (replace `1000` with your user/group ID from `id -u` and `id -g`):
+    
+    ```ini
+    [Service]
+    ExecStart=
+    ExecStart=/usr/bin/ydotoold --socket-path="/run/user/1000/.ydotool_socket" --socket-own="1000:1000"
+    ```
+    
+    Then restart:
+    ```bash
+    sudo systemctl restart ydotool
+    systemctl status ydotool
+    ```
+  </Tab>
+  <Tab title="Ubuntu/Debian">
+    ```bash
+    # Check for user service
+    systemctl --user status ydotool
+    
+    # If not found, check for system service
+    systemctl status ydotool
+    ```
+    
+    If only a system service exists, follow the Fedora instructions above.
+  </Tab>
+</Tabs>
+
+**Verify ydotool works:**
+```bash
+ydotool type "test"
+```
+
+If you see "Failed to connect to socket", the daemon isn't running or the socket permissions are wrong.
+
+## Debug Mode
+
+### Enable verbose logging
+
+```bash
+# Verbose
+voxtype -v
+
+# Debug (most verbose)
+voxtype -vv
+
+# Or via environment
+RUST_LOG=debug voxtype
+RUST_LOG=voxtype=trace voxtype
+```
+
+### Debug specific components
+
+```bash
+# Audio capture issues
+RUST_LOG=voxtype::audio=debug voxtype
+
+# Hotkey issues
+RUST_LOG=voxtype::hotkey=debug voxtype
+
+# Whisper issues
+RUST_LOG=voxtype::transcribe=debug voxtype
+
+# Output issues
+RUST_LOG=voxtype::output=debug voxtype
+```
+
+### Log to file
+
+```bash
+voxtype -vv 2>&1 | tee voxtype.log
+```
+
+## Getting Help
+
+If you're still having issues:
+
+1. **Run setup check:** `voxtype setup`
+2. **Gather debug logs:** `voxtype -vv 2>&1 | tee debug.log`
+3. **Check system info:**
+   ```bash
+   uname -a
+   groups
+   pactl info
+   systemctl --user status ydotool
+   ```
+4. **Open an issue:** [GitHub Issues](https://github.com/peteonrails/voxtype/issues)
+
+Include:
+- Voxtype version (`voxtype --version`)
+- Linux distribution and version
+- Desktop environment / Wayland compositor
+- Debug log output
+- Steps to reproduce
+
+See the full [Troubleshooting Guide](https://github.com/peteonrails/voxtype/blob/main/docs/TROUBLESHOOTING.md) for more detailed solutions.

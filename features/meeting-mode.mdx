@@ -1,0 +1,474 @@
+---
+title: Meeting Mode
+description: Continuous transcription for meetings, lectures, and interviews
+---
+
+Meeting mode provides continuous transcription for long-form audio capture. Unlike push-to-talk dictation (short bursts when you hold a hotkey), meeting mode records continuously and processes audio in chunks, building a timestamped transcript you can export and search later.
+
+## When to Use Meeting Mode
+
+Meeting mode is designed for:
+
+- **Video calls and meetings** (Zoom, Teams, Google Meet)
+- **Lectures and presentations**
+- **Interviews and conversations**
+- **Brainstorming sessions**
+- **Podcasts and recordings**
+
+For short dictation (a sentence or two at a time), use the normal push-to-talk workflow instead.
+
+## Quick Start
+
+```bash
+# 1. Enable meeting mode in config
+# Edit ~/.config/voxtype/config.toml:
+[meeting]
+enabled = true
+
+# 2. Restart daemon
+systemctl --user restart voxtype
+
+# 3. Start a meeting
+voxtype meeting start --title "Weekly Standup"
+
+# 4. When finished, stop and export
+voxtype meeting stop
+voxtype meeting export latest --format markdown --output standup.md
+```
+
+## Commands
+
+### Starting a Meeting
+
+```bash
+voxtype meeting start
+voxtype meeting start --title "Project Kickoff"
+voxtype meeting start -t "1:1 with Alice"
+```
+
+The `--title` flag is optional. Without it, meetings are named by date and time (e.g., "Meeting 2026-02-16 14:30").
+
+**Requirements**: The daemon must be running and meeting mode must be enabled in config.
+
+### Stopping a Meeting
+
+```bash
+voxtype meeting stop
+```
+
+Stops recording, processes remaining audio, saves the transcript, and returns to idle.
+
+### Pausing and Resuming
+
+```bash
+voxtype meeting pause   # Temporarily stop recording
+voxtype meeting resume  # Continue recording
+```
+
+Useful for breaks or side conversations you don't want transcribed.
+
+### Checking Status
+
+```bash
+voxtype meeting status
+```
+
+Shows whether a meeting is active, paused, or idle, along with the meeting ID if one is in progress.
+
+### Listing Past Meetings
+
+```bash
+voxtype meeting list          # Show 10 most recent
+voxtype meeting list --limit 5  # Show 5 most recent
+```
+
+Displays meeting ID, title, date, duration, status, and chunk count.
+
+### Viewing Meeting Details
+
+```bash
+voxtype meeting show latest
+voxtype meeting show <meeting-id>
+```
+
+Shows detailed information: title, start/end times, duration, word count, chunks, speakers detected, and transcription engine used.
+
+Use `latest` as shorthand for the most recent meeting's ID.
+
+### Exporting Transcripts
+
+```bash
+# Markdown to stdout (default)
+voxtype meeting export latest
+
+# Plain text to file
+voxtype meeting export latest --format text --output meeting.txt
+
+# JSON with timestamps and speakers
+voxtype meeting export latest --format json --timestamps --speakers
+
+# Subtitle formats
+voxtype meeting export latest --format srt --output meeting.srt
+voxtype meeting export latest --format vtt --output meeting.vtt
+```
+
+**Supported formats**:
+
+| Format | Flag | Description |
+|--------|------|-------------|
+| Markdown | `markdown` or `md` | Readable with headers and speaker labels |
+| Plain text | `text` or `txt` | Just the words, no formatting |
+| JSON | `json` | Structured data with all segment metadata |
+| SRT | `srt` | SubRip subtitle format |
+| VTT | `vtt` | WebVTT subtitle format |
+
+**Export options**:
+
+| Flag | Description |
+|------|-------------|
+| `--format`, `-f` | Output format (default: markdown) |
+| `--output`, `-o` | Write to file instead of stdout |
+| `--timestamps` | Include timestamps in output |
+| `--speakers` | Include speaker labels |
+| `--metadata` | Include metadata header (title, date, duration) |
+
+### Labeling Speakers
+
+When diarization detects multiple speakers, they're assigned IDs like `SPEAKER_00`, `SPEAKER_01`. Replace these with real names:
+
+```bash
+voxtype meeting label latest SPEAKER_00 "Alice"
+voxtype meeting label latest 1 "Bob"  # Can use just the number
+```
+
+Labels are saved and applied to all subsequent exports.
+
+### AI Summarization
+
+Generate a summary with key points, action items, and decisions:
+
+```bash
+# Markdown summary to stdout
+voxtype meeting summarize latest
+
+# JSON format
+voxtype meeting summarize latest --format json
+
+# Save to file
+voxtype meeting summarize latest --output summary.md
+```
+
+Requires a configured backend (see [Summarization Settings](#summarization-settings)).
+
+The summary includes:
+- Brief overview of the meeting
+- Key discussion points
+- Action items (with assignees when mentioned)
+- Decisions made
+
+### Deleting Meetings
+
+```bash
+voxtype meeting delete <meeting-id> --force
+```
+
+Permanently deletes the meeting record, transcript, and audio files. The `--force` flag is required to confirm deletion.
+
+## How It Works
+
+### Chunked Transcription
+
+Meeting mode splits continuous audio into fixed-duration chunks (default: 30 seconds) and transcribes each chunk as it becomes ready. This approach:
+
+- **Reduces memory usage**: No need to buffer entire meeting in RAM
+- **Provides progress**: See partial results as the meeting progresses
+- **Enables real-time monitoring**: Check status during the meeting
+- **Improves reliability**: A chunk failure doesn't lose the entire recording
+
+### Speaker Attribution
+
+Two diarization backends are available:
+
+**Simple (default)**: Uses audio source (mic vs loopback) to distinguish "You" from "Remote" speakers. No ML model required.
+
+**ML (optional)**: Uses ONNX-based speaker embeddings to identify individual speakers. Requires the `ml-diarization` feature and a downloaded model.
+
+For most users (1:1 calls, single remote participant), simple diarization is sufficient.
+
+### Storage
+
+Meetings are stored at `~/.local/share/voxtype/meetings/` (or your configured path):
+
+```
+~/.local/share/voxtype/meetings/
+  index.db                          # SQLite database
+  2026-02-16-weekly-standup/
+    metadata.json                   # Meeting metadata
+    transcript.json                 # Full transcript with segments
+```
+
+The SQLite database stores metadata for fast listing and lookup. Transcripts are JSON files for easy portability.
+
+## Configuration
+
+All meeting settings live under `[meeting]` in `~/.config/voxtype/config.toml`.
+
+### Basic Settings
+
+```toml
+[meeting]
+# Enable meeting mode (required)
+enabled = true
+
+# Duration of each audio chunk in seconds (default: 30)
+chunk_duration_secs = 30
+
+# Where to store meeting data (default: auto)
+# "auto" uses ~/.local/share/voxtype/meetings/
+storage_path = "auto"
+
+# Keep raw audio files after transcription (default: false)
+retain_audio = false
+
+# Maximum meeting duration in minutes (default: 180, 0 = unlimited)
+max_duration_mins = 180
+```
+
+### Audio Settings
+
+```toml
+[meeting.audio]
+# Microphone device (default: "default")
+mic_device = "default"
+
+# Loopback device for capturing remote audio
+# "auto" = auto-detect, "disabled" = mic only, or device name
+loopback_device = "auto"
+```
+
+Setting `loopback_device = "auto"` captures system audio (the other side of a call). When active, speaker attribution can distinguish between "You" (mic) and "Remote" (system audio).
+
+Set `loopback_device = "disabled"` if you only want your microphone.
+
+### Diarization Settings
+
+Speaker diarization identifies who said what:
+
+```toml
+[meeting.diarization]
+# Enable speaker diarization (default: true)
+enabled = true
+
+# Backend: "simple", "ml", or "subprocess" (default: "simple")
+backend = "simple"
+
+# Maximum speakers to detect (default: 10)
+max_speakers = 10
+```
+
+**Backends**:
+
+- **simple**: Uses audio source (mic vs loopback). No ML model needed.
+- **ml**: Uses ONNX embeddings to identify individual speakers. Requires `ml-diarization` feature.
+- **subprocess**: Same as ML but runs in separate process for memory isolation.
+
+### Summarization Settings
+
+```toml
+[meeting.summary]
+# Backend: "local", "remote", or "disabled" (default: "disabled")
+backend = "local"
+
+# Ollama settings (for local backend)
+ollama_url = "http://localhost:11434"
+ollama_model = "llama3.2"
+
+# Remote API settings (for remote backend)
+# remote_endpoint = "https://api.example.com/summarize"
+# remote_api_key = "your-api-key"
+
+# Request timeout in seconds (default: 120)
+timeout_secs = 120
+```
+
+**Using Ollama for local summarization**:
+
+1. Install Ollama: https://ollama.ai
+2. Pull a model: `ollama pull llama3.2`
+3. Set `backend = "local"` in config
+4. Run `voxtype meeting summarize latest`
+
+Ollama runs entirely on your machine. No transcript data leaves your computer.
+
+## Use Cases
+
+### Recording a Zoom Call
+
+```bash
+# 1. Configure loopback to capture remote audio
+# Edit config:
+[meeting.audio]
+loopback_device = "auto"
+
+# 2. Start meeting before joining call
+voxtype meeting start --title "Client Meeting"
+
+# 3. Join Zoom call, conduct meeting
+
+# 4. After call ends
+voxtype meeting stop
+voxtype meeting label latest 0 "Me"
+voxtype meeting label latest 1 "Client"
+voxtype meeting export latest --speakers --timestamps --output client-meeting.md
+```
+
+### Transcribing a Lecture
+
+```bash
+# Start recording
+voxtype meeting start --title "CS 101 Lecture 5"
+
+# Let it run during lecture
+
+# Stop and export
+voxtype meeting stop
+voxtype meeting export latest --format text --output lecture5.txt
+```
+
+### Interview Transcription
+
+```bash
+# Start interview
+voxtype meeting start --title "Interview - Jane Doe"
+
+# After interview
+voxtype meeting stop
+voxtype meeting label latest 0 "Interviewer"
+voxtype meeting label latest 1 "Jane Doe"
+voxtype meeting export latest --speakers --output interview.md
+
+# Generate summary
+voxtype meeting summarize latest --output interview-summary.md
+```
+
+## Tips for Best Results
+
+### Choose the Right Model
+
+Meeting transcription processes many chunks, so model choice affects both speed and accuracy:
+
+- **Fast hardware**: `large-v3-turbo` with GPU for best accuracy
+- **CPU only**: `base.en` or `small.en` for English
+- **Slower hardware**: `tiny.en` keeps up with real-time audio
+
+### Use a Good Microphone
+
+Transcription accuracy depends heavily on audio quality. A dedicated microphone or headset works much better than a laptop's built-in mic.
+
+### Set Chunk Duration Appropriately
+
+Default 30 seconds works well for most cases:
+
+- **Shorter chunks (15-20s)**: Faster partial results, more processing overhead
+- **Longer chunks (45-60s)**: Better accuracy on slower hardware, more context per transcription
+
+### Label Speakers After the Meeting
+
+Run `voxtype meeting list` to find the meeting ID, then use `voxtype meeting label` to assign names to auto-detected speaker IDs. This makes the exported transcript much more readable.
+
+### Export in Multiple Formats
+
+You can export the same meeting in different formats:
+
+- **Markdown**: For reading and sharing
+- **JSON**: For processing in other tools
+- **SRT/VTT**: For adding subtitles to a video recording
+
+## Troubleshooting
+
+### Meeting mode not available
+
+**Error**: "Meeting mode is not enabled"
+
+**Solution**: Add to config and restart:
+```toml
+[meeting]
+enabled = true
+```
+```bash
+systemctl --user restart voxtype
+```
+
+### No remote audio captured
+
+**Problem**: Only your voice is transcribed, not the other side of the call.
+
+**Solutions**:
+
+1. Enable loopback device:
+   ```toml
+   [meeting.audio]
+   loopback_device = "auto"
+   ```
+
+2. Check PipeWire/PulseAudio monitors:
+   ```bash
+   pactl list sources | grep -E "Name:|Description:"
+   # Look for a monitor source
+   ```
+
+3. Manually specify loopback device:
+   ```toml
+   [meeting.audio]
+   loopback_device = "alsa_output.pci-0000_00_1f.3.analog-stereo.monitor"
+   ```
+
+### Transcription can't keep up
+
+**Problem**: Chunks take longer to transcribe than real-time.
+
+**Solutions**:
+
+1. Use a smaller model:
+   ```toml
+   [whisper]
+   model = "tiny.en"  # or "base.en"
+   ```
+
+2. Enable GPU acceleration (see [GPU Acceleration](/features/gpu-acceleration))
+
+3. Increase chunk duration:
+   ```toml
+   [meeting]
+   chunk_duration_secs = 45  # Longer chunks = less frequent transcription
+   ```
+
+### Speaker attribution not working
+
+**Problem**: All speech attributed to same speaker.
+
+**Solutions**:
+
+1. Ensure diarization is enabled:
+   ```toml
+   [meeting.diarization]
+   enabled = true
+   ```
+
+2. For simple backend, ensure loopback is configured:
+   ```toml
+   [meeting.audio]
+   loopback_device = "auto"
+   ```
+
+3. For ML backend, ensure model is downloaded and feature is enabled:
+   ```bash
+   # Check if binary supports ML diarization
+   voxtype --version | grep ml-diarization
+   ```
+
+## Further Reading
+
+- [Full Meeting Mode Documentation](https://github.com/peteonrails/voxtype/blob/main/docs/MEETING_MODE.md)
+- [Transcription Engines](/features/transcription-engines) - Choose the right engine
+- [Configuration guide](/guides/configuration) - All meeting mode settings

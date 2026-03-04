@@ -1,0 +1,367 @@
+---
+title: voxtype setup
+description: Setup and installation utilities for Voxtype
+---
+
+## Command
+
+```bash
+voxtype setup [action] [flags]
+```
+
+## Description
+
+Interactive and automated setup utilities for installing Voxtype, configuring integrations, and managing models. Running `voxtype setup` without arguments performs a basic setup: creates directories, generates a default config file, and checks for the configured Whisper model.
+
+## Flags
+
+<ParamField path="--download" type="boolean">
+  Download the configured model if missing (shorthand for basic setup)
+</ParamField>
+
+<ParamField path="--model" type="string">
+  Specify which model to download (use with `--download`)
+  
+  **Whisper models:** tiny, base, small, medium, large-v3, large-v3-turbo (and `.en` variants)
+  
+  **Parakeet models:** parakeet-tdt-0.6b-v3, parakeet-tdt-0.6b-v3-int8
+</ParamField>
+
+<ParamField path="--quiet" type="boolean">
+  Suppress all output (for scripting/automation)
+</ParamField>
+
+<ParamField path="--no-post-install" type="boolean">
+  Suppress "Next steps" instructions (show progress, but no tutorial)
+</ParamField>
+
+## Subcommands
+
+### check
+
+Run comprehensive system checks: CPU compatibility, directories, config file, input group membership, output chain status, and installed models.
+
+```bash
+voxtype setup check
+```
+
+Unlike the default `setup` command (which is non-blocking and informational), `check` validates the installation and shows red X marks for failures.
+
+### systemd
+
+Install Voxtype as a systemd user service.
+
+```bash
+voxtype setup systemd
+voxtype setup systemd --status
+voxtype setup systemd --uninstall
+```
+
+<ParamField path="--install" type="boolean">
+  Install the systemd service (default action)
+</ParamField>
+
+<ParamField path="--uninstall" type="boolean">
+  Remove the systemd service
+</ParamField>
+
+<ParamField path="--status" type="boolean">
+  Show service status
+</ParamField>
+
+**Example:**
+
+```bash
+voxtype setup systemd
+systemctl --user enable --now voxtype
+voxtype setup systemd --status
+```
+
+### waybar
+
+Show Waybar configuration snippets for integrating Voxtype status into your bar.
+
+```bash
+voxtype setup waybar
+voxtype setup waybar --json
+voxtype setup waybar --install
+```
+
+<ParamField path="--json" type="boolean">
+  Output only the JSON config (for scripting)
+</ParamField>
+
+<ParamField path="--css" type="boolean">
+  Output only the CSS config (for scripting)
+</ParamField>
+
+<ParamField path="--install" type="boolean">
+  Install Waybar integration (inject config and CSS into your Waybar config)
+</ParamField>
+
+<ParamField path="--uninstall" type="boolean">
+  Remove Waybar integration
+</ParamField>
+
+**Example:**
+
+```bash
+voxtype setup waybar --install
+pkill -SIGUSR2 waybar  # Reload Waybar
+```
+
+### dms
+
+DankMaterialShell (DMS) integration for Plasma desktop widgets.
+
+```bash
+voxtype setup dms
+voxtype setup dms --install
+```
+
+<ParamField path="--install" type="boolean">
+  Install DMS plugin (create widget directory and QML file)
+</ParamField>
+
+<ParamField path="--uninstall" type="boolean">
+  Uninstall DMS plugin
+</ParamField>
+
+<ParamField path="--qml" type="boolean">
+  Output only the QML content (for scripting)
+</ParamField>
+
+### model
+
+Interactive model selection and download.
+
+```bash
+voxtype setup model                    # Interactive selection
+voxtype setup model --list             # List installed models
+voxtype setup model --set large-v3     # Set specific model
+voxtype setup model --set base --restart
+```
+
+<ParamField path="--list" type="boolean">
+  List installed models instead of interactive selection
+</ParamField>
+
+<ParamField path="--set" type="string">
+  Set a specific model as default (must already be downloaded)
+</ParamField>
+
+<ParamField path="--restart" type="boolean">
+  Restart the daemon after changing the model (use with `--set`)
+</ParamField>
+
+**Example:**
+
+```bash
+# Download and switch to large-v3-turbo, restart daemon
+voxtype setup --download --model large-v3-turbo
+voxtype setup model --set large-v3-turbo --restart
+```
+
+### gpu
+
+Manage GPU acceleration (Vulkan for Whisper, CUDA/ROCm for Parakeet).
+
+```bash
+voxtype setup gpu                      # Show status
+voxtype setup gpu --enable
+voxtype setup gpu --disable
+voxtype setup gpu --status
+```
+
+<ParamField path="--enable" type="boolean">
+  Enable GPU acceleration (auto-detects best backend: Vulkan, CUDA, or ROCm)
+</ParamField>
+
+<ParamField path="--disable" type="boolean">
+  Disable GPU acceleration (switch back to CPU)
+</ParamField>
+
+<ParamField path="--status" type="boolean">
+  Show current backend status (default action)
+</ParamField>
+
+GPU acceleration requires the appropriate binary variant:
+- **Vulkan:** `voxtype-*-vulkan` (AMD/Intel GPUs)
+- **CUDA:** `voxtype-*-onnx-cuda` (NVIDIA GPUs, Parakeet/ONNX only)
+- **ROCm:** `voxtype-*-onnx-rocm` (AMD GPUs, Parakeet/ONNX only)
+
+### onnx
+
+Switch between Whisper and ONNX transcription engines (Parakeet, Moonshine, SenseVoice, etc.).
+
+```bash
+voxtype setup onnx                     # Show status
+voxtype setup onnx --enable
+voxtype setup onnx --disable
+```
+
+<ParamField path="--enable" type="boolean">
+  Enable ONNX engine (switch to ONNX binary)
+</ParamField>
+
+<ParamField path="--disable" type="boolean">
+  Disable ONNX engine (switch back to Whisper binary)
+</ParamField>
+
+<ParamField path="--status" type="boolean">
+  Show current ONNX backend status (default action)
+</ParamField>
+
+ONNX backends support multiple engines via the `--engine` flag or config `engine` field:
+- `parakeet` - NVIDIA Parakeet-TDT (punctuation, streaming)
+- `moonshine` - UsefulSensors Moonshine (fast, multilingual)
+- `sensevoice` - Alibaba SenseVoice (emotion detection, event tagging)
+- `paraformer` - Alibaba Paraformer (timestamp prediction)
+- `dolphin` - SYSTRAN Faster-Whisper equivalent
+- `omnilingual` - Multilingual optimized model
+
+### compositor
+
+Compositor integration (fixes modifier key interference for Hyprland/Sway/River).
+
+```bash
+voxtype setup compositor hyprland
+voxtype setup compositor sway --show
+voxtype setup compositor river --uninstall
+```
+
+<ParamField path="hyprland" type="subcommand">
+  Hyprland compositor configuration
+</ParamField>
+
+<ParamField path="sway" type="subcommand">
+  Sway compositor configuration
+</ParamField>
+
+<ParamField path="river" type="subcommand">
+  River compositor configuration
+</ParamField>
+
+Each compositor subcommand supports:
+
+<ParamField path="--uninstall" type="boolean">
+  Uninstall the compositor integration
+</ParamField>
+
+<ParamField path="--status" type="boolean">
+  Show installation status
+</ParamField>
+
+<ParamField path="--show" type="boolean">
+  Show config without installing (print to stdout)
+</ParamField>
+
+**Example (Hyprland):**
+
+```bash
+voxtype setup compositor hyprland --show   # Preview config
+voxtype setup compositor hyprland          # Install
+```
+
+This creates `~/.config/hypr/voxtype.conf` with keybinding pass-through rules that prevent modifier keys (like Shift) from interfering with Voxtype recording.
+
+### vad
+
+Download the Silero VAD model for Voice Activity Detection.
+
+```bash
+voxtype setup vad
+voxtype setup vad --status
+```
+
+<ParamField path="--status" type="boolean">
+  Show VAD model status (default: download)
+</ParamField>
+
+VAD filters silence before transcription, reducing latency and hallucinations. After downloading, enable in config:
+
+```toml
+[vad]
+enabled = true
+backend = "whisper"  # Or "energy" (no model needed)
+```
+
+## Examples
+
+### Basic Setup
+
+```bash
+# First-time setup (creates directories, config, checks for model)
+voxtype setup
+
+# Download the default model (base)
+voxtype setup --download
+
+# Download a specific model
+voxtype setup --download --model large-v3-turbo
+
+# Silent setup for scripts
+voxtype setup --download --model base --quiet
+```
+
+### Model Management
+
+```bash
+# Interactive model selection (shows menu)
+voxtype setup model
+
+# List what's installed
+voxtype setup model --list
+
+# Switch to a different model (must be downloaded first)
+voxtype setup model --set medium.en --restart
+
+# Download Parakeet model
+voxtype setup --download --model parakeet-tdt-0.6b-v3
+```
+
+### Integration Setup
+
+```bash
+# Install as systemd service
+voxtype setup systemd
+systemctl --user enable --now voxtype
+
+# Add Waybar status widget
+voxtype setup waybar --install
+
+# Fix Hyprland modifier keys
+voxtype setup compositor hyprland
+```
+
+### GPU Acceleration
+
+```bash
+# Check current backend
+voxtype setup gpu --status
+
+# Enable GPU (auto-detects Vulkan/CUDA/ROCm)
+voxtype setup gpu --enable
+
+# Requires appropriate binary:
+# - voxtype-*-vulkan (Whisper + Vulkan)
+# - voxtype-*-onnx-cuda (ONNX + CUDA)
+# - voxtype-*-onnx-rocm (ONNX + ROCm)
+```
+
+### System Verification
+
+```bash
+# Run all checks (shows failures in red)
+voxtype setup check
+
+# Check output chain (wtype, ydotool, clipboard)
+voxtype config  # Includes output chain status
+```
+
+## Notes
+
+- **Root warning:** Setup commands detect if run as root and warn that models will download to `/root/.local/share/voxtype/` instead of your user directory.
+- **Model paths:** Models are stored in `~/.local/share/voxtype/models/` by default.
+- **Config location:** `~/.config/voxtype/config.toml`
+- **Backend switching:** When using packaged installations (`/usr/bin/voxtype` symlink), switching GPU backends only requires a service restart, not reinstalling the service.

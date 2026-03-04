@@ -1,0 +1,563 @@
+---
+title: Integrations
+description: Integrate Voxtype with status bars, compositors, and other tools
+---
+
+Voxtype is designed to integrate seamlessly with your Linux desktop environment. This page covers status bar integration, systemd service setup, compositor workflows, and remote server configurations.
+
+## Waybar Integration
+
+Add a Voxtype status indicator to your Waybar that shows when you're recording.
+
+### What It Shows
+
+The Waybar module displays an icon that changes based on Voxtype's state:
+
+| State | Default Icon | Meaning |
+|-------|--------------|------|
+| Idle | 🎙️ | Ready to record |
+| Recording | 🎤 | Hotkey held, capturing audio |
+| Transcribing | ⏳ | Processing speech to text |
+| Stopped | (empty) | Voxtype not running |
+
+### Quick Setup
+
+```bash
+voxtype setup waybar
+```
+
+This outputs ready-to-use config snippets for Waybar and CSS.
+
+### Manual Setup
+
+**1. Add module to Waybar config** (`~/.config/waybar/config`):
+
+```json
+"custom/voxtype": {
+    "exec": "voxtype status --follow --format json",
+    "return-type": "json",
+    "format": "{}",
+    "tooltip": true
+}
+```
+
+**2. Add to module list**:
+
+```json
+"modules-right": ["custom/voxtype", "pulseaudio", "clock"]
+```
+
+**3. Restart Waybar**:
+
+```bash
+systemctl --user restart waybar
+```
+
+### Extended Status Info
+
+Include model, device, and backend information:
+
+```json
+"custom/voxtype": {
+    "exec": "voxtype status --follow --format json --extended",
+    "return-type": "json",
+    "format": "{} [{}]",
+    "tooltip": true
+}
+```
+
+Output includes:
+```json
+{
+  "text": "🎙️",
+  "class": "idle",
+  "tooltip": "Voxtype ready\nModel: base.en\nDevice: default\nBackend: CPU (AVX-512)",
+  "model": "base.en",
+  "device": "default",
+  "backend": "CPU (AVX-512)"
+}
+```
+
+### Custom Icons
+
+Voxtype supports multiple icon themes:
+
+**Option 1: Use Voxtype config**
+
+```toml
+[status]
+icon_theme = "nerd-font"  # emoji, nerd-font, material, phosphor, etc.
+```
+
+**Option 2: Use Waybar format-icons**
+
+```json
+"custom/voxtype": {
+    "exec": "voxtype status --follow --format json",
+    "return-type": "json",
+    "format": "{icon}",
+    "format-icons": {
+        "idle": "",        // Nerd Font microphone
+        "recording": "",  // Nerd Font recording dot
+        "transcribing": "", // Nerd Font spinner
+        "stopped": ""
+    }
+}
+```
+
+**Available themes**:
+
+| Theme | Idle | Recording | Transcribing | Requires |
+|-------|------|-----------|--------------|----------|
+| `emoji` | 🎙️ | 🎤 | ⏳ | None |
+| `nerd-font` | U+F130 | U+F111 | U+F110 | Nerd Font |
+| `material` | U+F036C | U+F040A | U+F04CE | Material Design Icons |
+| `phosphor` | U+E43A | U+E438 | U+E225 | Phosphor Icons |
+| `minimal` | ○ | ● | ◐ | None |
+| `text` | [MIC] | [REC] | [...] | None |
+
+### Custom Styling
+
+Add to `~/.config/waybar/style.css`:
+
+```css
+#custom-voxtype {
+    padding: 0 8px;
+    font-size: 14px;
+}
+
+#custom-voxtype.recording {
+    color: #ff5555;
+    animation: pulse 1s infinite;
+}
+
+#custom-voxtype.transcribing {
+    color: #f1fa8c;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+```
+
+### Troubleshooting
+
+**Module shows nothing**: Verify state file is enabled:
+```toml
+state_file = "auto"  # In config.toml
+```
+```bash
+systemctl --user restart voxtype
+```
+
+**Recording state not updating**: Check state file exists:
+```bash
+cat $XDG_RUNTIME_DIR/voxtype/state
+```
+
+**For more details**: See the [full Waybar integration guide](https://github.com/peteonrails/voxtype/blob/main/docs/WAYBAR.md).
+
+## Systemd Service
+
+Run Voxtype as a systemd user service for automatic startup.
+
+### Installation
+
+```bash
+voxtype setup systemd --install
+```
+
+This creates `~/.config/systemd/user/voxtype.service` and enables it.
+
+### Manual Installation
+
+Create `~/.config/systemd/user/voxtype.service`:
+
+```ini
+[Unit]
+Description=Voxtype voice-to-text daemon
+After=pipewire.service pulseaudio.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/voxtype daemon
+Restart=on-failure
+RestartSec=5
+Environment="PATH=%h/.local/bin:/usr/local/bin:/usr/bin"
+
+[Install]
+WantedBy=default.target
+```
+
+Enable and start:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable voxtype
+systemctl --user start voxtype
+```
+
+### Managing the Service
+
+```bash
+# Check status
+systemctl --user status voxtype
+
+# View logs
+journalctl --user -u voxtype --follow
+
+# Restart
+systemctl --user restart voxtype
+
+# Stop
+systemctl --user stop voxtype
+
+# Disable (don't start on login)
+systemctl --user disable voxtype
+```
+
+### Environment Variables
+
+Add environment variables to the service by creating an override:
+
+```bash
+systemctl --user edit voxtype
+```
+
+Add:
+```ini
+[Service]
+Environment="VOXTYPE_MODEL=large-v3-turbo"
+Environment="DRI_PRIME=1"  # For GPU selection
+```
+
+Or use an environment file:
+
+```bash
+# Create ~/.config/voxtype/voxtype.env
+VOXTYPE_MODEL=large-v3-turbo
+DRI_PRIME=1
+```
+
+Reference it in the service:
+```ini
+[Service]
+EnvironmentFile=%h/.config/voxtype/voxtype.env
+```
+
+## DankMaterialShell Widget (KDE Plasma)
+
+DankMaterialShell (DMS) is a QML-based alternative shell for KDE Plasma. Voxtype provides a status widget.
+
+### Installation
+
+```bash
+voxtype setup dms --install
+```
+
+This installs the QML widget to `~/.local/share/plasma/plasmoids/`.
+
+### Usage
+
+1. Right-click on your panel
+2. "Add Widgets"
+3. Search for "Voxtype"
+4. Add to panel
+
+The widget shows the current state (idle/recording/transcribing) with icon and tooltip.
+
+### Uninstallation
+
+```bash
+voxtype setup dms --uninstall
+```
+
+## Compositor Integration
+
+Use your compositor's native keybindings for push-to-talk instead of Voxtype's built-in hotkey.
+
+### Why Compositor Keybindings?
+
+- **No special permissions**: No need to be in `input` group
+- **Native integration**: Uses compositor's key-release events
+- **Flexible keybindings**: Use Super/Meta and other modifiers
+- **Works with multi-modifier combos**: Super+Ctrl+X, etc.
+
+### Hyprland Setup
+
+**1. Disable built-in hotkey**:
+
+```toml
+# ~/.config/voxtype/config.toml
+[hotkey]
+enabled = false
+```
+
+**2. Add bindings** to `~/.config/hypr/hyprland.conf`:
+
+```hyprlang
+# Basic push-to-talk
+bind = SUPER, V, exec, voxtype record start
+bindr = SUPER, V, exec, voxtype record stop
+
+# Cancel with Escape
+bind = , ESCAPE, exec, voxtype record cancel
+```
+
+**3. Restart Voxtype**:
+
+```bash
+systemctl --user restart voxtype
+```
+
+### Sway Setup
+
+```bash
+# ~/.config/sway/config
+bindsym --no-repeat $mod+v exec voxtype record start
+bindsym --release $mod+v exec voxtype record stop
+bindsym Escape exec voxtype record cancel
+```
+
+### River Setup
+
+```bash
+# ~/.config/river/init
+riverctl map normal Super V spawn 'voxtype record start'
+riverctl map -release normal Super V spawn 'voxtype record stop'
+riverctl map normal None Escape spawn 'voxtype record cancel'
+```
+
+### Output Hooks (Modifier Key Interference)
+
+When using multi-modifier keybindings (e.g., Super+Ctrl+X), releasing keys slowly can cause typed text to trigger compositor shortcuts.
+
+**Solution**: Use output hooks to disable shortcuts during typing.
+
+```bash
+voxtype setup compositor hyprland  # or sway, river
+```
+
+This configures:
+
+1. **Pre-output hook**: Switches to a submap that blocks shortcuts
+2. **Post-output hook**: Returns to normal submap after typing
+
+Manual configuration:
+
+```toml
+# ~/.config/voxtype/config.toml
+[output]
+pre_output_command = "hyprctl dispatch submap voxtype_suppress"
+post_output_command = "hyprctl dispatch submap reset"
+```
+
+```hyprlang
+# ~/.config/hypr/hyprland.conf
+submap = voxtype_suppress
+  # Block all bindings during transcription output
+  bind = , catchall, exec, :
+submap = reset
+```
+
+## Remote Whisper API
+
+Transcribe audio on a remote server instead of locally.
+
+### Use Cases
+
+- **Self-hosted server**: Offload transcription to a more powerful machine
+- **Shared infrastructure**: Multiple users share a GPU server
+- **Cloud services**: Use OpenAI's Whisper API (privacy considerations apply)
+
+### Self-Hosted whisper.cpp Server
+
+**On the server**:
+
+```bash
+# Build whisper.cpp with server
+git clone https://github.com/ggerganov/whisper.cpp
+cd whisper.cpp
+cmake -B build -DGGML_CUDA=ON  # Or DGGML_VULKAN=ON for Vulkan
+cmake --build build
+
+# Download model
+bash ./models/download-ggml-model.sh large-v3-turbo
+
+# Start server
+./build/bin/whisper-server -m models/ggml-large-v3-turbo.bin -p 8080
+```
+
+**On the client** (your desktop):
+
+```toml
+# ~/.config/voxtype/config.toml
+[whisper]
+backend = "remote"
+remote_endpoint = "http://192.168.1.100:8080"
+remote_timeout_secs = 30
+```
+
+### OpenAI API
+
+```toml
+[whisper]
+backend = "remote"
+remote_endpoint = "https://api.openai.com"
+remote_model = "whisper-1"
+remote_api_key = "sk-..."
+remote_timeout_secs = 30
+```
+
+**Privacy notice**: Your audio is sent to OpenAI's servers. For privacy-sensitive use, self-host or use local transcription.
+
+**Recommendation**: Use environment variable for API key:
+
+```bash
+export VOXTYPE_WHISPER_API_KEY="sk-..."
+```
+
+## LLM Post-Processing
+
+Pipe transcriptions through a local LLM for grammar correction, filler word removal, or text formatting.
+
+### Ollama Integration
+
+**1. Install Ollama**: https://ollama.ai
+
+**2. Pull a model**:
+
+```bash
+ollama pull llama3.2:1b  # Small, fast model
+```
+
+**3. Configure post-processing**:
+
+```toml
+[output.post_process]
+command = "ollama run llama3.2:1b 'Clean up this dictation. Fix grammar, remove filler words:'"
+timeout_ms = 30000
+```
+
+### LM Studio Integration
+
+Create a script (`~/.config/voxtype/lm-studio-cleanup.sh`):
+
+```bash
+#!/bin/bash
+INPUT=$(cat)
+
+curl -s http://localhost:1234/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"messages\": [{
+      \"role\": \"system\",
+      \"content\": \"Clean up dictated text. Fix spelling, remove filler words (um, uh), add proper punctuation. Output ONLY the cleaned text.\"
+    },{
+      \"role\": \"user\",
+      \"content\": \"$INPUT\"
+    }],
+    \"temperature\": 0.1
+  }" | jq -r '.choices[0].message.content'
+```
+
+Make executable:
+```bash
+chmod +x ~/.config/voxtype/lm-studio-cleanup.sh
+```
+
+Configure:
+```toml
+[output.post_process]
+command = "~/.config/voxtype/lm-studio-cleanup.sh"
+timeout_ms = 30000
+```
+
+### Profiles for Different Contexts
+
+Define profiles for context-specific post-processing:
+
+```toml
+# Default post-processing
+[output.post_process]
+command = "ollama run llama3.2:1b 'Clean up:'"
+
+# Slack-specific profile
+[profiles.slack]
+post_process_command = "ollama run llama3.2:1b 'Format for Slack:'"
+
+# Code comments profile
+[profiles.code]
+post_process_command = "ollama run llama3.2:1b 'Format as code comment:'"
+output_mode = "clipboard"
+```
+
+Use with:
+```bash
+voxtype record start --profile slack
+voxtype record start --profile code
+```
+
+### Performance Considerations
+
+- **Adds latency**: 2-5 seconds depending on model size
+- **Use small models**: llama3.2:1b is fast and sufficient for cleanup
+- **Timeout protection**: Falls back to original text if LLM fails
+
+## Output Hooks
+
+Run custom commands before and after typing output.
+
+### Use Cases
+
+- **Compositor integration**: Block modifier keys during typing
+- **Notifications**: Alert when transcription starts/finishes
+- **Logging**: Record transcription events
+- **Custom workflows**: Trigger other automation
+
+### Configuration
+
+```toml
+[output]
+pre_output_command = "notify-send 'Typing...'"
+post_output_command = "notify-send 'Done'"
+```
+
+### Examples
+
+**Hyprland submap integration**:
+```toml
+pre_output_command = "hyprctl dispatch submap voxtype_suppress"
+post_output_command = "hyprctl dispatch submap reset"
+```
+
+**Logging**:
+```toml
+post_output_command = "echo $(date) >> ~/voxtype.log"
+```
+
+**Custom script**:
+```toml
+pre_output_command = "/home/user/.config/voxtype/pre-output.sh"
+post_output_command = "/home/user/.config/voxtype/post-output.sh"
+```
+
+## Polybar Alternative
+
+If you use Polybar instead of Waybar:
+
+```ini
+[module/voxtype]
+type = custom/script
+exec = voxtype status --format text
+interval = 1
+format = <label>
+label = %output%
+```
+
+## Further Reading
+
+- [Waybar Integration Guide](https://github.com/peteonrails/voxtype/blob/main/docs/WAYBAR.md)
+- [Configuration guide](/guides/configuration)
+- [User Manual](https://github.com/peteonrails/voxtype/blob/main/docs/USER_MANUAL.md)
