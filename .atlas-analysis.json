@@ -1,0 +1,108 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "Voxtype",
+  "projectDescription": "Push-to-talk voice-to-text for Linux with offline transcription and Wayland compositor integration",
+  "theme": "aspen",
+  "primaryColor": "#040404",
+  "lightColor": null,
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/basic-usage",
+              "guides/compositor-integration",
+              "guides/configuration",
+              "guides/output-modes",
+              "guides/text-processing"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/transcription-engines",
+              "features/gpu-acceleration",
+              "features/meeting-mode",
+              "features/integrations"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Command Reference",
+        "groups": [
+          {
+            "group": "Core Commands",
+            "pages": [
+              "commands/daemon",
+              "commands/record",
+              "commands/transcribe"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "commands/setup",
+              "commands/config",
+              "commands/status"
+            ]
+          },
+          {
+            "group": "Meeting Mode",
+            "pages": [
+              "commands/meeting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Advanced",
+        "groups": [
+          {
+            "group": "Resources",
+            "pages": [
+              "advanced/troubleshooting",
+              "advanced/architecture",
+              "advanced/contributing"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Push-to-talk voice-to-text transcription",
+    "7 transcription engines (Whisper, Parakeet, Moonshine, SenseVoice, Paraformer, Dolphin, Omnilingual)",
+    "GPU acceleration (Vulkan, CUDA, ROCm)",
+    "Meeting mode with continuous transcription and speaker attribution",
+    "Wayland compositor integration (Hyprland, Sway, River)",
+    "Multiple output modes (keyboard typing, clipboard, paste)",
+    "Offline-first operation with optional remote server support",
+    "Audio feedback with customizable themes",
+    "Text post-processing with LLM integration",
+    "Waybar/status bar integration"
+  ],
+  "publicApiSurface": [
+    "voxtype daemon",
+    "voxtype record start/stop/toggle/cancel",
+    "voxtype transcribe <file>",
+    "voxtype setup [action]",
+    "voxtype config",
+    "voxtype status",
+    "voxtype meeting start/stop/pause/resume",
+    "voxtype meeting export",
+    "voxtype meeting list"
+  ]
+}
